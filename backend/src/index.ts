@@ -5,6 +5,8 @@ const path = require('node:path');
 const { authRouter } = require('./routes/auth.routes');
 const { categoryRouter } = require('./routes/category.routes');
 const { productRouter } = require('./routes/product.routes');
+const cartRouter = require('./routes/cart.routes').default;
+const orderRouter = require('./routes/order.routes').default;
 
 export {};
 
@@ -24,6 +26,8 @@ app.get('/', (req: import('express').Request, res: import('express').Response) =
 app.use('/auth', authRouter);
 app.use('/categories', categoryRouter);
 app.use('/products', productRouter);
+app.use('/cart', cartRouter);
+app.use('/orders', orderRouter);
 
 app.listen(PORT, () => {
 	console.log(`Server is running on http://localhost:${PORT}`);
