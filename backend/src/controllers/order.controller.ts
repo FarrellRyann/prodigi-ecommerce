@@ -1,7 +1,8 @@
-// src/controllers/order.controller.ts
 import { Request, Response } from 'express';
+import { ZodError } from 'zod';
 import * as orderService from '../services/order.service.ts';
 import { isServiceError } from '../services/errors.service.ts';
+import { xenditWebhookSchema } from '../utils/validation.ts';
 
 type AuthRequest = Request & {
   user?: {
@@ -58,10 +59,19 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
 export const handleXenditWebhook = async (req: Request, res: Response): Promise<void> => {
   try {
     const callbackToken = req.header('x-callback-token') || req.header('X-CALLBACK-TOKEN');
-    const result = await orderService.handleXenditInvoiceWebhook(callbackToken, req.body);
+    
+    // Validate request body
+    const validatedBody = xenditWebhookSchema.parse(req.body);
+
+    const result = await orderService.handleXenditInvoiceWebhook(callbackToken, validatedBody);
 
     res.status(200).json(result);
   } catch (error) {
+    if (error instanceof ZodError) {
+       res.status(400).json({ error: 'Invalid webhook payload.', details: error.errors });
+       return;
+    }
+
     if (isServiceError(error)) {
       res.status(error.statusCode).json({ error: error.message });
       return;

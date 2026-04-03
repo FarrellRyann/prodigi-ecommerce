@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import helmet from 'helmet';
 import path from 'node:path';
+import rateLimit from 'express-rate-limit';
+import { env } from './config/env.ts';
 import { authRouter } from './routes/auth.routes.ts';
 import { categoryRouter } from './routes/category.routes.ts';
 import { productRouter } from './routes/product.routes.ts';
@@ -11,15 +13,25 @@ import { isServiceError } from './services/errors.service.ts';
 
 const app = express();
 
-dotenv.config();
+app.use(helmet({
+	crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
+const limiter = rateLimit({
+	windowMs: 15 * 60 * 1000, // 15 minutes
+	max: 100, // limit each IP to 100 requests per windowMs
+	message: { error: 'Too many requests from this IP, please try again after 15 minutes.' }
+});
+
 app.use(cors());
 app.use(express.json());
+app.use(limiter);
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
-const PORT = process.env.PORT || 3000;
+const PORT = env.PORT;
 
-app.get('/', (req: import('express').Request, res: import('express').Response) => {
-	res.send('API is running...');
+app.get('/', (req, res) => {
+	res.send('ProDigi API is running...');
 });
 
 app.use('/auth', authRouter);

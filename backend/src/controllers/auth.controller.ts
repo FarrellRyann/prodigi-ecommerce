@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.ts';
+import { env } from '../config/env.ts';
 
 type AuthRequest = Request & {
   user?: {
@@ -12,11 +13,7 @@ type AuthRequest = Request & {
 };
 
 const createToken = (user: { id: string; email: string; role: string }) => {
-  const jwtSecret = process.env.JWT_SECRET;
-
-  if (!jwtSecret) {
-    throw new Error('JWT_SECRET is not configured.');
-  }
+  const jwtSecret = env.JWT_SECRET;
 
   return jwt.sign(
     {
@@ -34,10 +31,6 @@ export const register = async (req: Request, res: Response) => {
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
-  }
-
-  if (!process.env.JWT_SECRET) {
-    return res.status(500).json({ error: 'Server misconfiguration: JWT_SECRET is missing.' });
   }
 
   try {

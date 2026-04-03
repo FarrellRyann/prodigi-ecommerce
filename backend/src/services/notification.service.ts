@@ -1,14 +1,9 @@
 import { Resend } from 'resend';
 import { ServiceError } from './errors.service.ts';
+import { env } from '../config/env.ts';
 
-const resendApiKey = process.env.RESEND_API_KEY;
-const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
-
-if (!resendApiKey) {
-  console.warn('[notification.service] RESEND_API_KEY is not configured. Email sending will fail.');
-}
-
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const resend = new Resend(env.RESEND_API_KEY);
+const appBaseUrl = env.APP_BASE_URL;
 
 type OrderItemEmail = {
   name: string;
