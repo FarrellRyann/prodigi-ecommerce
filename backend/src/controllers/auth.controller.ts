@@ -1,8 +1,7 @@
 import type { Request, Response } from 'express';
-
-const bcrypt = require('bcrypt') as typeof import('bcrypt');
-const jwt = require('jsonwebtoken') as typeof import('jsonwebtoken');
-const { prisma } = require('../lib/prisma') as { prisma: import('../generated/client').PrismaClient };
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { prisma } from '../lib/prisma.ts';
 
 type AuthRequest = Request & {
   user?: {
@@ -30,11 +29,15 @@ const createToken = (user: { id: string; email: string; role: string }) => {
   );
 };
 
-const register = async (req: Request, res: Response) => {
+export const register = async (req: Request, res: Response) => {
   const { email, password } = req.body as { email?: string; password?: string };
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
+  }
+
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ error: 'Server misconfiguration: JWT_SECRET is missing.' });
   }
 
   try {
@@ -61,17 +64,18 @@ const register = async (req: Request, res: Response) => {
 
     return res.status(201).json({ user, token });
   } catch (error: unknown) {
-    const prismaError = error as { code?: string };
+    const prismaError = error as { code?: string; message?: string };
 
-    if (prismaError.code === 'P2002') {
+    if (prismaError?.code === 'P2002') {
       return res.status(409).json({ error: 'Email already registered.' });
     }
 
+    console.error('[register] failed:', error);
     return res.status(500).json({ error: 'Failed to register user.' });
   }
 };
 
-const login = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body as { email?: string; password?: string };
 
   if (!email || !password) {
@@ -112,7 +116,7 @@ const login = async (req: Request, res: Response) => {
   }
 };
 
-const me = async (req: AuthRequest, res: Response) => {
+export const me = async (req: AuthRequest, res: Response) => {
   if (!req.user?.userId) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
@@ -138,8 +142,3 @@ const me = async (req: AuthRequest, res: Response) => {
   }
 };
 
-module.exports = {
-  register,
-  login,
-  me,
-};

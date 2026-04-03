@@ -1,9 +1,7 @@
 // src/controllers/order.controller.ts
 import { Request, Response } from 'express';
-import * as orderService from '../services/order.service';
-const { isServiceError } = require('../services/errors.service') as {
-  isServiceError: (error: unknown) => error is { message: string; statusCode: number };
-};
+import * as orderService from '../services/order.service.ts';
+import { isServiceError } from '../services/errors.service.ts';
 
 type AuthRequest = Request & {
   user?: {
@@ -56,6 +54,7 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
   }
 };
 
+// Webhook Xendit Invoice
 export const handleXenditWebhook = async (req: Request, res: Response): Promise<void> => {
   try {
     const callbackToken = req.header('x-callback-token') || req.header('X-CALLBACK-TOKEN');

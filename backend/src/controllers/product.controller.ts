@@ -1,32 +1,6 @@
 import type { Request, Response } from 'express';
-
-const productService = require('../services/product.service') as {
-  createProduct: (payload: {
-    categoryId: string;
-    name: string;
-    description?: string | null;
-    price: number;
-    stock: number;
-    imageUrl?: string | null;
-  }) => Promise<unknown>;
-  getProducts: () => Promise<unknown>;
-  getProductById: (id: string) => Promise<unknown>;
-  updateProduct: (
-    id: string,
-    payload: {
-      categoryId?: string;
-      name?: string;
-      description?: string | null;
-      price?: number;
-      stock?: number;
-      imageUrl?: string | null;
-    }
-  ) => Promise<unknown>;
-  deleteProduct: (id: string) => Promise<void>;
-};
-const { isServiceError } = require('../services/errors.service') as {
-  isServiceError: (error: unknown) => boolean;
-};
+import * as productService from '../services/product.service.ts';
+import { isServiceError } from '../services/errors.service.ts';
 
 type ProductPayload = {
   categoryId?: string;
@@ -99,7 +73,7 @@ const createProduct = async (req: Request, res: Response) => {
   }
 };
 
-const getProducts = async (req: Request, res: Response) => {
+const getProducts = async (_req: Request, res: Response) => {
   try {
     const products = await productService.getProducts();
 
@@ -204,12 +178,4 @@ const deleteProduct = async (req: Request, res: Response) => {
   }
 };
 
-module.exports = {
-  createProduct,
-  getProducts,
-  getProductById,
-  updateProduct,
-  deleteProduct,
-};
-
-export {};
+export { createProduct, getProducts, getProductById, updateProduct, deleteProduct };

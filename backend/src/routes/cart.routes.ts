@@ -1,21 +1,19 @@
 import express from 'express';
-import * as cartController from '../controllers/cart.controller';
-const { authMiddleware } = require('../middleware/authMiddleware');
+import * as cartController from '../controllers/cart.controller.ts';
+import { authMiddleware } from '../middleware/authMiddleware.ts';
 
-const router = express.Router();
+export const cartRouter = express.Router();
 
 // Semua API Cart membutuhkan user yang sudah login (authMiddleware)
-router.use(authMiddleware);
+cartRouter.use(authMiddleware);
 
 // Endpoint: GET /api/cart (mendapatkan seluruh isi cart user)
-router.get('/', cartController.getCart);
+cartRouter.get('/', cartController.getCart);
 
 // Endpoint: POST /api/cart (menambahkan produk digital ke cart)
 // Body: { productId: string }
-router.post('/', cartController.addToCart);
+cartRouter.post('/', cartController.addToCart);
 
 // Endpoint: DELETE /api/cart/:itemId (menghapus produk dari cart)
 // Params: itemId adalah ID CartItem yang ingin diremove
-router.delete('/:itemId', cartController.removeFromCart);
-
-export default router;
+cartRouter.delete('/:itemId', cartController.removeFromCart);

@@ -1,21 +1,20 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const path = require('node:path');
-const { authRouter } = require('./routes/auth.routes');
-const { categoryRouter } = require('./routes/category.routes');
-const { productRouter } = require('./routes/product.routes');
-const cartRouter = require('./routes/cart.routes').default;
-const orderRouter = require('./routes/order.routes').default;
-
-export {};
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { authRouter } from './routes/auth.routes.ts';
+import { categoryRouter } from './routes/category.routes.ts';
+import { productRouter } from './routes/product.routes.ts';
+import { cartRouter } from './routes/cart.routes.ts';
+import { orderRouter } from './routes/order.routes.ts';
+import { isServiceError } from './services/errors.service.ts';
 
 const app = express();
 
 dotenv.config();
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 const PORT = process.env.PORT || 3000;
 
@@ -28,6 +27,17 @@ app.use('/categories', categoryRouter);
 app.use('/products', productRouter);
 app.use('/cart', cartRouter);
 app.use('/orders', orderRouter);
+
+// Global error handler (maps ServiceError to HTTP response)
+// Keep last so it catches errors from routes above
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: unknown, _req: import('express').Request, res: import('express').Response, _next: import('express').NextFunction) => {
+	if (isServiceError(err)) {
+		return res.status(err.statusCode ?? 500).json({ error: err.message });
+	}
+	console.error('[Unhandled Error]', err);
+	return res.status(500).json({ error: 'Internal Server Error' });
+});
 
 app.listen(PORT, () => {
 	console.log(`Server is running on http://localhost:${PORT}`);

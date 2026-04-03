@@ -1,4 +1,4 @@
-class ServiceError extends Error {
+export class ServiceError extends Error {
   statusCode: number;
 
   constructor(message: string, statusCode = 500) {
@@ -8,13 +8,6 @@ class ServiceError extends Error {
   }
 }
 
-const isServiceError = (error: unknown): error is ServiceError => {
+export const isServiceError = (error: unknown): error is ServiceError => {
   return error instanceof ServiceError;
 };
-
-module.exports = {
-  ServiceError,
-  isServiceError,
-};
-
-export {};

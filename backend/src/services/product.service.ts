@@ -1,7 +1,5 @@
-const { prisma } = require('../lib/prisma') as { prisma: import('../generated/client').PrismaClient };
-const { ServiceError } = require('./errors.service') as {
-  ServiceError: new (message: string, statusCode?: number) => Error & { statusCode: number };
-};
+import { prisma } from '../lib/prisma.ts';
+import { ServiceError } from './errors.service.ts';
 
 type ProductPayload = {
   categoryId?: string;
@@ -12,7 +10,7 @@ type ProductPayload = {
   imageUrl?: string | null;
 };
 
-const createProduct = async (payload: {
+export const createProduct = async (payload: {
   categoryId: string;
   name: string;
   description?: string | null;
@@ -44,7 +42,7 @@ const createProduct = async (payload: {
   });
 };
 
-const getProducts = async () => {
+export const getProducts = async () => {
   return prisma.product.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
@@ -53,7 +51,7 @@ const getProducts = async () => {
   });
 };
 
-const getProductById = async (id: string) => {
+export const getProductById = async (id: string) => {
   const product = await prisma.product.findUnique({
     where: { id },
     include: {
@@ -68,7 +66,7 @@ const getProductById = async (id: string) => {
   return product;
 };
 
-const updateProduct = async (id: string, payload: ProductPayload) => {
+export const updateProduct = async (id: string, payload: ProductPayload) => {
   const existingProduct = await prisma.product.findUnique({
     where: { id },
     select: { id: true },
@@ -105,7 +103,7 @@ const updateProduct = async (id: string, payload: ProductPayload) => {
   });
 };
 
-const deleteProduct = async (id: string) => {
+export const deleteProduct = async (id: string) => {
   const existingProduct = await prisma.product.findUnique({
     where: { id },
     select: { id: true },
@@ -128,12 +126,3 @@ const deleteProduct = async (id: string) => {
   }
 };
 
-module.exports = {
-  createProduct,
-  getProducts,
-  getProductById,
-  updateProduct,
-  deleteProduct,
-};
-
-export {};

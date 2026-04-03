@@ -1,15 +1,13 @@
-const { prisma } = require('../lib/prisma') as { prisma: import('../generated/client').PrismaClient };
-const { ServiceError } = require('./errors.service') as {
-  ServiceError: new (message: string, statusCode?: number) => Error & { statusCode: number };
-};
+import { prisma } from '../lib/prisma.ts';
+import { ServiceError } from './errors.service.ts';
 
-const createCategory = async (name: string) => {
+export const createCategory = async (name: string) => {
   return prisma.category.create({
     data: { name: name.trim() },
   });
 };
 
-const getCategories = async () => {
+export const getCategories = async () => {
   return prisma.category.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
@@ -20,7 +18,7 @@ const getCategories = async () => {
   });
 };
 
-const getCategoryById = async (id: string) => {
+export const getCategoryById = async (id: string) => {
   const category = await prisma.category.findUnique({
     where: { id },
     include: {
@@ -35,7 +33,7 @@ const getCategoryById = async (id: string) => {
   return category;
 };
 
-const updateCategory = async (id: string, name: string) => {
+export const updateCategory = async (id: string, name: string) => {
   const existingCategory = await prisma.category.findUnique({
     where: { id },
     select: { id: true },
@@ -53,7 +51,7 @@ const updateCategory = async (id: string, name: string) => {
   });
 };
 
-const deleteCategory = async (id: string) => {
+export const deleteCategory = async (id: string) => {
   const category = await prisma.category.findUnique({
     where: { id },
     select: { id: true },
@@ -74,12 +72,3 @@ const deleteCategory = async (id: string) => {
   await prisma.category.delete({ where: { id } });
 };
 
-module.exports = {
-  createCategory,
-  getCategories,
-  getCategoryById,
-  updateCategory,
-  deleteCategory,
-};
-
-export {};

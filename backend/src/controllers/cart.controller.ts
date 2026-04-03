@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
-import * as cartService from '../services/cart.service';
-const { isServiceError } = require('../services/errors.service') as {
-  isServiceError: (error: unknown) => error is { message: string; statusCode: number };
-};
+import * as cartService from '../services/cart.service.ts';
+import { isServiceError } from '../services/errors.service.ts';
 
 type AuthRequest = Request & {
   user?: {

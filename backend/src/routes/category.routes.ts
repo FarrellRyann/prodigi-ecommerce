@@ -1,21 +1,17 @@
-const express = require('express');
-const { authMiddleware } = require('../middleware/authMiddleware');
-const {
+import express from 'express';
+import { authMiddleware } from '../middleware/authMiddleware.ts';
+import {
   createCategory,
   getCategories,
   getCategoryById,
   updateCategory,
   deleteCategory,
-} = require('../controllers/category.controller');
+} from '../controllers/category.controller.ts';
 
-const categoryRouter = express.Router();
+export const categoryRouter = express.Router();
 
 categoryRouter.get('/', getCategories);
 categoryRouter.get('/:id', getCategoryById);
 categoryRouter.post('/', authMiddleware, createCategory);
 categoryRouter.put('/:id', authMiddleware, updateCategory);
 categoryRouter.delete('/:id', authMiddleware, deleteCategory);
-
-module.exports = { categoryRouter };
-
-export {};

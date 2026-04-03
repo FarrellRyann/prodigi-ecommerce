@@ -14,12 +14,12 @@ import * as process from 'node:process'
 import * as path from 'node:path'
 
 import * as runtime from "@prisma/client/runtime/library"
-import * as $Enums from "./enums"
+import * as $Enums from "./enums.ts"
 import * as $Class from "./internal/class"
 import * as Prisma from "./internal/prismaNamespace"
 
-export * as $Enums from './enums'
-export * from "./enums"
+export * as $Enums from './enums.ts'
+export * from "./enums.ts"
 /**
  * ## Prisma Client
  * 

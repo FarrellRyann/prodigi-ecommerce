@@ -1,9 +1,7 @@
 // src/services/order.service.ts
-const { prisma } = require('../lib/prisma');
+import { prisma } from '../lib/prisma.ts';
 import { Xendit } from 'xendit-node';
-const { ServiceError } = require('./errors.service') as {
-  ServiceError: new (message: string, statusCode?: number) => Error;
-};
+import { ServiceError } from './errors.service.ts';
 
 // Pastikan Secret Key diset di .env
 const xendit = new Xendit({
@@ -109,6 +107,73 @@ export const getUserOrders = async (userId: string) => {
   return orders;
 };
 
+// Handle Xendit webhook for invoice events
+export const handleXenditWebhook = async (payload: {
+  id: string; // invoice id
+  external_id: string; // we set as order id
+  status: string;
+  paid_at?: string;
+}) => {
+  const { id: invoiceId, external_id: externalId, status, paid_at } = payload;
+
+  // idempotency: if payment already terminal, skip
+  const payment = await prisma.payment.findFirst({
+    where: {
+      OR: [
+        { invoiceId },
+        { orderId: externalId },
+      ],
+    },
+  });
+
+  if (!payment) {
+    // unknown invoice, ignore but return success to avoid retries storm
+    return;
+  }
+
+  // If already processed to terminal state, do nothing
+  if (payment.status === 'PAID' || payment.status === 'EXPIRED' || payment.status === 'FAILED') {
+    return;
+  }
+
+  // Map Xendit status to internal
+  let paymentStatus: 'PENDING' | 'PAID' | 'EXPIRED' | 'FAILED' = 'PENDING';
+  let orderStatus: 'PENDING' | 'PAID' | 'PROCESSED' | 'COMPLETED' | 'CANCELLED' = 'PENDING';
+
+  if (status === 'PAID') {
+    paymentStatus = 'PAID';
+    orderStatus = 'PAID';
+  } else if (status === 'EXPIRED') {
+    paymentStatus = 'EXPIRED';
+    orderStatus = 'CANCELLED';
+  } else if (status === 'FAILED') {
+    paymentStatus = 'FAILED';
+    orderStatus = 'CANCELLED';
+  } else {
+    // For other statuses, keep pending
+    paymentStatus = 'PENDING';
+    orderStatus = 'PENDING';
+  }
+
+  const paidAtDate = paid_at ? new Date(paid_at) : new Date();
+
+  await prisma.$transaction(async (tx: any) => {
+    await tx.payment.update({
+      where: { orderId: externalId },
+      data: {
+        status: paymentStatus,
+        paidAt: paymentStatus === 'PAID' ? paidAtDate : null,
+      },
+    });
+
+    await tx.order.update({
+      where: { id: externalId },
+      data: {
+        status: orderStatus,
+      },
+    });
+  });
+};
 export const handleXenditInvoiceWebhook = async (
   callbackToken: string | undefined,
   payload: XenditInvoiceWebhookPayload

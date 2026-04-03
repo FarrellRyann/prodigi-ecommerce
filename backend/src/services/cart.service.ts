@@ -1,7 +1,5 @@
-const { prisma } = require('../lib/prisma') as { prisma: import('../generated/client').PrismaClient };
-const { ServiceError } = require('./errors.service') as {
-  ServiceError: new (message: string, statusCode?: number) => Error;
-};
+import { prisma } from '../lib/prisma.ts';
+import { ServiceError } from './errors.service.ts';
 
 export const getCart = async (userId: string) => {
   // Cari atau buat cart jika user belum punya

@@ -1,20 +1,18 @@
 // src/routes/order.routes.ts
 import express from 'express';
-import * as orderController from '../controllers/order.controller';
-const { authMiddleware } = require('../middleware/authMiddleware');
+import { checkout, getOrders, handleXenditWebhook } from '../controllers/order.controller.ts';
+import { authMiddleware } from '../middleware/authMiddleware.ts';
 
-const router = express.Router();
+export const orderRouter = express.Router();
 
 // Endpoint webhook publik dari Xendit
-router.post('/webhook/xendit', orderController.handleXenditWebhook);
+orderRouter.post('/webhook/xendit', handleXenditWebhook);
 
 // Middleware Proteksi
-router.use(authMiddleware);
+orderRouter.use(authMiddleware);
 
-// Endpoint: POST /api/orders/checkout (Merubah Cart menjadi Invoice Xendit)
-router.post('/checkout', orderController.checkout);
+// Endpoint: POST /orders/checkout (Merubah Cart menjadi Invoice Xendit)
+orderRouter.post('/checkout', checkout);
 
-// Endpoint: GET /api/orders (Riwayat Belanja User)
-router.get('/', orderController.getOrders);
-
-export default router;
+// Endpoint: GET /orders (Riwayat Belanja User)
+orderRouter.get('/', getOrders);

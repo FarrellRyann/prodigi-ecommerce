@@ -1,15 +1,6 @@
 import type { Request, Response } from 'express';
-
-const categoryService = require('../services/category.service') as {
-  createCategory: (name: string) => Promise<unknown>;
-  getCategories: () => Promise<unknown>;
-  getCategoryById: (id: string) => Promise<unknown>;
-  updateCategory: (id: string, name: string) => Promise<unknown>;
-  deleteCategory: (id: string) => Promise<void>;
-};
-const { isServiceError } = require('../services/errors.service') as {
-  isServiceError: (error: unknown) => boolean;
-};
+import * as categoryService from '../services/category.service.ts';
+import { isServiceError } from '../services/errors.service.ts';
 
 const createCategory = async (req: Request, res: Response) => {
   const { name } = req.body as { name?: string };
@@ -37,7 +28,7 @@ const getParamId = (req: Request) => {
   return typeof rawId === 'string' ? rawId : '';
 };
 
-const getCategories = async (req: Request, res: Response) => {
+const getCategories = async (_req: Request, res: Response) => {
   try {
     const categories = await categoryService.getCategories();
 
@@ -120,12 +111,4 @@ const deleteCategory = async (req: Request, res: Response) => {
   }
 };
 
-module.exports = {
-  createCategory,
-  getCategories,
-  getCategoryById,
-  updateCategory,
-  deleteCategory,
-};
-
-export {};
+export { createCategory, getCategories, getCategoryById, updateCategory, deleteCategory };

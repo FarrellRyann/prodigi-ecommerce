@@ -1,9 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import multer from 'multer';
 
-const multer = require('multer') as typeof import('multer');
-
-const uploadsDir = path.join(__dirname, '../../uploads');
+const uploadsDir = path.resolve(process.cwd(), 'uploads');
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -41,6 +40,4 @@ const uploadImage = multer({
   },
 });
 
-module.exports = { uploadImage, uploadsDir };
-
-export {};
+export { uploadImage, uploadsDir };
