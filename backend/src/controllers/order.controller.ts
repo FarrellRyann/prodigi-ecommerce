@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
 import * as orderService from '../services/order.service.ts';
 import { isServiceError } from '../services/errors.service.ts';

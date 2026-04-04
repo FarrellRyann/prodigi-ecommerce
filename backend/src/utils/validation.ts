@@ -39,7 +39,6 @@ export const createProductSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
   description: z.string().optional().nullable(),
   price: z.coerce.number().int().positive('Price must be a positive integer'),
-  stock: z.coerce.number().int().nonnegative('Stock cannot be negative'),
   imageUrl: z.string().url('Invalid image URL').optional().nullable(),
 });
 
@@ -48,7 +47,6 @@ export const updateProductSchema = z.object({
   name: z.string().min(1, 'Product name cannot be empty').optional(),
   description: z.string().optional().nullable(),
   price: z.coerce.number().int().positive('Price must be a positive integer').optional(),
-  stock: z.coerce.number().int().nonnegative('Stock cannot be negative').optional(),
   imageUrl: z.string().url('Invalid image URL').optional().nullable(),
 });
 

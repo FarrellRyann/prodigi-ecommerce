@@ -1,10 +1,10 @@
-import { Router } from 'express';
+import express from 'express';
 import { register, login, me } from '../controllers/auth.controller.ts';
 import { authMiddleware } from '../middleware/authMiddleware.ts';
 import { validate } from '../middleware/validate.ts';
 import { registerSchema, loginSchema } from '../utils/validation.ts';
 
-export const authRouter = Router();
+export const authRouter = express.Router();
 
 authRouter.post('/register', validate(registerSchema), register);
 authRouter.post('/login', validate(loginSchema), login);

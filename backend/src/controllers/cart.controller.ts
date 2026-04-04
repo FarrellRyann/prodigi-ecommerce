@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import * as cartService from '../services/cart.service.ts';
 import { isServiceError } from '../services/errors.service.ts';
 

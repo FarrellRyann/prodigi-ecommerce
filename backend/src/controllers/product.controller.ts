@@ -7,7 +7,6 @@ type ProductPayload = {
   name?: string;
   description?: string | null;
   price?: number;
-  stock?: number;
   imageUrl?: string | null;
 };
 
@@ -30,7 +29,7 @@ const getParamId = (req: Request) => {
 };
 
 const createProduct = async (req: Request, res: Response) => {
-  const { categoryId, name, description, price, stock, imageUrl } = req.body as ProductPayload;
+  const { categoryId, name, description, price, imageUrl } = req.body as ProductPayload;
   const requestWithFile = req as Request & { file?: Express.Multer.File };
 
   if (!categoryId || !name?.trim()) {
@@ -38,18 +37,16 @@ const createProduct = async (req: Request, res: Response) => {
   }
 
   const parsedPrice = parseNumber(price);
-  const parsedStock = parseNumber(stock);
 
-  if (!validateNumber(parsedPrice) || !validateNumber(parsedStock)) {
-    return res.status(400).json({ error: 'price and stock must be valid numbers.' });
+  if (!validateNumber(parsedPrice)) {
+    return res.status(400).json({ error: 'price must be a valid number.' });
   }
 
   const safePrice = parsedPrice;
-  const safeStock = parsedStock;
   const uploadedImageUrl = requestWithFile.file ? `/uploads/${requestWithFile.file.filename}` : undefined;
 
-  if (safePrice < 0 || safeStock < 0) {
-    return res.status(400).json({ error: 'price and stock cannot be negative.' });
+  if (safePrice < 0) {
+    return res.status(400).json({ error: 'price cannot be negative.' });
   }
 
   try {
@@ -58,12 +55,12 @@ const createProduct = async (req: Request, res: Response) => {
       name,
       description: description ?? null,
       price: safePrice,
-      stock: safeStock,
       imageUrl: uploadedImageUrl ?? imageUrl ?? null,
     });
 
     return res.status(201).json(product);
   } catch (error) {
+    console.error("[createProduct] Error:", error);
     if (isServiceError(error)) {
       const serviceError = error as { statusCode: number; message: string };
       return res.status(serviceError.statusCode).json({ error: serviceError.message });
@@ -111,7 +108,7 @@ const getProductById = async (req: Request, res: Response) => {
 
 const updateProduct = async (req: Request, res: Response) => {
   const id = getParamId(req);
-  const { categoryId, name, description, price, stock, imageUrl } = req.body as ProductPayload;
+  const { categoryId, name, description, price, imageUrl } = req.body as ProductPayload;
   const requestWithFile = req as Request & { file?: Express.Multer.File };
 
   if (!id) {
@@ -119,19 +116,11 @@ const updateProduct = async (req: Request, res: Response) => {
   }
 
   const hasPriceField = price !== undefined;
-  const hasStockField = stock !== undefined;
   const parsedPrice = hasPriceField ? parseNumber(price) : undefined;
-  const parsedStock = hasStockField ? parseNumber(stock) : undefined;
 
   if (hasPriceField) {
     if (!validateNumber(parsedPrice) || (parsedPrice as number) < 0) {
       return res.status(400).json({ error: 'price must be a valid non-negative number.' });
-    }
-  }
-
-  if (hasStockField) {
-    if (!validateNumber(parsedStock) || (parsedStock as number) < 0) {
-      return res.status(400).json({ error: 'stock must be a valid non-negative number.' });
     }
   }
 
@@ -141,7 +130,6 @@ const updateProduct = async (req: Request, res: Response) => {
       ...(name !== undefined ? { name } : {}),
       ...(description !== undefined ? { description } : {}),
       ...(hasPriceField ? { price: parsedPrice as number } : {}),
-      ...(hasStockField ? { stock: parsedStock as number } : {}),
       ...(imageUrl !== undefined ? { imageUrl } : {}),
       ...(requestWithFile.file ? { imageUrl: `/uploads/${requestWithFile.file.filename}` } : {}),
     });

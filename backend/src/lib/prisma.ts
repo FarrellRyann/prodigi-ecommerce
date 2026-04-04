@@ -1,3 +1,15 @@
-import { PrismaClient } from '../generated/index.js';
+// Driver Adapter for Prisma 7
+import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { env } from '../config/env.ts';
 
-export const prisma = new PrismaClient();
+const connectionString = `${env.DATABASE_URL}`;
+
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+
+export const prisma = new PrismaClient({
+  adapter,
+  log: ['info', 'warn', 'error'],
+});
