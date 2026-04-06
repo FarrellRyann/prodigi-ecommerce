@@ -7,6 +7,7 @@ type ProductPayload = {
   description?: string | null;
   price?: number;
   imageUrl?: string | null;
+  downloadUrl?: string | null;
 };
 
 export const createProduct = async (payload: {
@@ -15,6 +16,7 @@ export const createProduct = async (payload: {
   description?: string | null;
   price: number;
   imageUrl?: string | null;
+  downloadUrl?: string | null;
 }) => {
   const category = await prisma.category.findUnique({
     where: { id: payload.categoryId },
@@ -32,6 +34,7 @@ export const createProduct = async (payload: {
       description: payload.description ?? null,
       price: payload.price,
       imageUrl: payload.imageUrl ?? null,
+      downloadUrl: payload.downloadUrl ?? null,
     },
     include: {
       category: true,
@@ -92,6 +95,7 @@ export const updateProduct = async (id: string, payload: ProductPayload) => {
       ...(payload.description !== undefined ? { description: payload.description } : {}),
       ...(payload.price !== undefined ? { price: payload.price } : {}),
       ...(payload.imageUrl !== undefined ? { imageUrl: payload.imageUrl } : {}),
+      ...(payload.downloadUrl !== undefined ? { downloadUrl: payload.downloadUrl } : {}),
     },
     include: {
       category: true,

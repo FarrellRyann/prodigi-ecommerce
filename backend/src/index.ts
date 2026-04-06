@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'node:path';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env.ts';
 import { authRouter } from './routes/auth.routes.ts';
 import { categoryRouter } from './routes/category.routes.ts';
@@ -24,8 +25,12 @@ const limiter = rateLimit({
 	message: { error: 'Too many requests from this IP, please try again after 15 minutes.' }
 });
 
-app.use(cors());
+app.use(cors({
+  origin: env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+}));
 app.use(express.json());
+app.use(cookieParser());
 app.use(limiter);
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 

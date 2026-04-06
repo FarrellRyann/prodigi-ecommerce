@@ -55,6 +55,13 @@ export const register = async (req: Request, res: Response) => {
       role: user.role,
     });
 
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    });
+
     return res.status(201).json({ user, token });
   } catch (error: unknown) {
     const prismaError = error as { code?: string; message?: string };
@@ -94,6 +101,13 @@ export const login = async (req: Request, res: Response) => {
       id: user.id,
       email: user.email,
       role: user.role,
+    });
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
 
     return res.json({

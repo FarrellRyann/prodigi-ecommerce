@@ -13,12 +13,11 @@ type AuthRequest = Request & {
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
+  const token = req.cookies?.token || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!token) {
     return res.status(401).json({ error: 'Unauthorized. Token is required.' });
   }
-
-  const token = authHeader.split(' ')[1];
   const jwtSecret = process.env.JWT_SECRET;
 
   if (!jwtSecret) {
