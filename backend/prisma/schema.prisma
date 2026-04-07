@@ -21,6 +21,12 @@ enum Role {
   CUSTOMER
 }
 
+enum ProductType {
+  FILE
+  COURSE
+  SUBSCRIPTION
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -36,6 +42,11 @@ enum PaymentStatus {
   EXPIRED
 }
 
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+}
+
 // User
 model User {
   id        String   @id @default(uuid())
@@ -48,6 +59,8 @@ model User {
   // Relations
   cart   Cart?
   orders Order[]
+  libraryItems LibraryItem[]
+  subscriptions Subscription[]
 }
 
 //Category 
@@ -62,20 +75,25 @@ model Category {
 
 // Product
 model Product {
-  id          String   @id @default(uuid())
+  id          String      @id @default(uuid())
   categoryId  String
   name        String
   description String?
   price       Int
+  productType ProductType @default(FILE)
   imageUrl    String?
   downloadUrl String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  accessUrl   String?     // For COURSE or SUBSCRIPTION external links
+  accessExpiryDays Int?   // Optional time-limited access (days). Null => perpetual access
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   // Relations
   category   Category   @relation(fields: [categoryId], references: [id])
   cartItems  CartItem[]
   orderItems OrderItem[]
+  libraryItems LibraryItem[]
+  subscriptions Subscription[]
 }
 
 // Cart
@@ -119,6 +137,7 @@ model Order {
   user    User        @relation(fields: [userId], references: [id])
   items   OrderItem[]
   payment Payment?
+  subscriptions Subscription[]
 }
 
 // OrderItems
@@ -133,6 +152,7 @@ model OrderItem {
   // Relations
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
+  libraryItem LibraryItem?
 }
 
 // Payment
@@ -149,6 +169,59 @@ model Payment {
 
   // Relations
   order Order @relation(fields: [orderId], references: [id])
+}
+
+// Library entitlement (explicit library table)
+// One entitlement per (userId, productId), deduped; purchase history remains in order/orderItem.
+model LibraryItem {
+  id String @id @default(uuid())
+
+  userId    String
+  productId String
+
+  // Link the entitlement to the purchase record that granted it.
+  // This is unique to keep one-to-one mapping with an OrderItem.
+  orderItemId String @unique
+
+  purchasedAt DateTime
+  expiresAt   DateTime? // null => perpetual
+
+  // Snapshots help prevent access URLs changing after purchase.
+  accessUrlSnapshot   String?
+  downloadUrlSnapshot String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+// Subscription entitlement wrapper for products of type SUBSCRIPTION.
+model Subscription {
+  id String @id @default(uuid())
+
+  userId    String
+  productId String
+  orderId   String
+
+  startsAt DateTime
+  endsAt   DateTime?
+  status   SubscriptionStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
 }
 
 

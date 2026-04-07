@@ -1,5 +1,5 @@
 import express from 'express';
-import { getLibrary, getLibraryProductDownload } from '../controllers/library.controller.ts';
+import { getLibrary, getLibraryProductAccess, getLibraryProductDownload } from '../controllers/library.controller.ts';
 import { authMiddleware } from '../middleware/authMiddleware.ts';
 
 export const libraryRouter = express.Router();
@@ -12,3 +12,6 @@ libraryRouter.get('/', getLibrary);
 
 // Endpoint: GET /library/:productId/download (Mendapatkan akses download produk yang dibeli)
 libraryRouter.get('/:productId/download', getLibraryProductDownload);
+
+// Endpoint: GET /library/:productId/access (Mendapatkan URL akses produk yang dibeli)
+libraryRouter.get('/:productId/access', getLibraryProductAccess);

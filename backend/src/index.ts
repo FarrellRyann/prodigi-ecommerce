@@ -11,6 +11,7 @@ import { productRouter } from './routes/product.routes.ts';
 import { cartRouter } from './routes/cart.routes.ts';
 import { orderRouter } from './routes/order.routes.ts';
 import { libraryRouter } from './routes/library.routes.ts';
+import { webhookRouter } from './routes/webhook.routes.ts';
 import { isServiceError } from './services/errors.service.ts';
 
 const app = express();
@@ -45,6 +46,7 @@ app.use('/categories', categoryRouter);
 app.use('/products', productRouter);
 app.use('/cart', cartRouter);
 app.use('/orders', orderRouter);
+app.use('/webhooks', webhookRouter);
 app.use('/library', libraryRouter);
 
 // Global error handler (maps ServiceError to HTTP response)

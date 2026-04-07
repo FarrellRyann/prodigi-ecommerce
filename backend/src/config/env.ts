@@ -11,6 +11,9 @@ const envSchema = z.object({
   XENDIT_SECRET_KEY: z.string().min(1, 'XENDIT_SECRET_KEY is required'),
   XENDIT_CALLBACK_TOKEN: z.string().min(1, 'XENDIT_CALLBACK_TOKEN is required'),
   RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
+  // Comma-separated list of admin emails allowed to self-register as ADMIN.
+  // Production setups should keep this list controlled and narrow.
+  ADMIN_BOOTSTRAP_EMAILS: z.string().optional(),
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
 });

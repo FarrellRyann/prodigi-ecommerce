@@ -34,12 +34,19 @@ export const register = async (req: Request, res: Response) => {
   }
 
   try {
+    const adminEmails = env.ADMIN_BOOTSTRAP_EMAILS
+      ? env.ADMIN_BOOTSTRAP_EMAILS.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+      : [];
+    const normalizedEmail = email.trim().toLowerCase();
+    const assignedRole = adminEmails.includes(normalizedEmail) ? 'ADMIN' : 'CUSTOMER';
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
+        role: assignedRole,
       },
       select: {
         id: true,
@@ -57,6 +64,14 @@ export const register = async (req: Request, res: Response) => {
 
     res.cookie('token', token, {
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    });
+
+    // Non-httponly role cookie for middleware hint
+    res.cookie('role', user.role, {
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 1 day
@@ -110,6 +125,14 @@ export const login = async (req: Request, res: Response) => {
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
 
+    // Non-httponly role cookie for middleware role-based routing hint
+    res.cookie('role', user.role, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    });
+
     return res.json({
       token,
       user: {
@@ -149,3 +172,8 @@ export const me = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const logout = async (_req: Request, res: Response) => {
+  res.clearCookie('token', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
+  res.clearCookie('role', { httpOnly: false, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
+  return res.json({ message: 'Logged out successfully.' });
+};

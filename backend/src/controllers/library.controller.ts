@@ -46,3 +46,25 @@ export const getLibraryProductDownload = async (req: AuthRequest, res: Response,
     next(error);
   }
 };
+
+// Endpoint: GET /library/:productId/access (unified access)
+export const getLibraryProductAccess = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const productId = req.params.productId as string;
+    if (!productId) {
+      res.status(400).json({ error: 'Product ID is required' });
+      return;
+    }
+
+    const accessInfo = await libraryService.getAccessUrl(userId, productId);
+    res.json({ data: accessInfo });
+  } catch (error) {
+    next(error);
+  }
+};
