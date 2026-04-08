@@ -19,3 +19,5 @@ cartRouter.post('/', validate(addToCartSchema), cartController.addToCart);
 // Endpoint: DELETE /api/cart/:itemId (menghapus produk dari cart)
 // Params: itemId adalah ID CartItem yang ingin diremove
 cartRouter.delete('/:itemId', cartController.removeFromCart);
+// Endpoint: POST /api/cart/sync (synchronize local cart with backend)
+cartRouter.post('/sync', cartController.syncCart);

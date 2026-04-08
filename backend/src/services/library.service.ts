@@ -1,5 +1,7 @@
 import { prisma } from '../lib/prisma.ts';
 import { ServiceError } from './errors.service.ts';
+import { generateSignedUrl } from './file.service.ts';
+
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -114,15 +116,18 @@ export const getAccessUrl = async (userId: string, productId: string) => {
       if (!libraryItem.downloadUrlSnapshot) {
         throw new ServiceError('File untuk produk ini belum tersedia, silakan hubungi admin.', 404);
       }
-      return { url: libraryItem.downloadUrlSnapshot };
+      const signedUrl = await generateSignedUrl(libraryItem.downloadUrlSnapshot);
+      return { url: signedUrl };
     }
 
     if (libraryItem.product.productType === 'COURSE' || libraryItem.product.productType === 'SUBSCRIPTION') {
       if (!libraryItem.accessUrlSnapshot) {
         throw new ServiceError('Akses untuk produk ini belum tersedia, silakan hubungi admin.', 404);
       }
-      return { url: libraryItem.accessUrlSnapshot };
+      const signedUrl = await generateSignedUrl(libraryItem.accessUrlSnapshot);
+      return { url: signedUrl };
     }
+
 
     throw new ServiceError('Unknown product type.', 400);
   }

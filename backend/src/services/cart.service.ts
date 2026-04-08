@@ -55,14 +55,23 @@ export const addToCart = async (userId: string, productId: string) => {
     throw new ServiceError('Produk sudah ada di dalam keranjang.', 409);
   }
 
+  // Check via libraryItem (source of truth for ownership)
+  const libraryEntry = await prisma.libraryItem.findUnique({
+    where: { userId_productId: { userId, productId } },
+    select: { id: true },
+  });
+
+  if (libraryEntry) {
+    throw new ServiceError('Produk ini sudah ada di library Anda.', 409);
+  }
+
+  // Fallback: also check via orderItems for orders that haven't been fulfilled to library yet
   const ownedProduct = await prisma.orderItem.findFirst({
     where: {
       productId,
       order: {
         userId,
-        status: {
-          in: ['PAID', 'PROCESSED', 'COMPLETED'],
-        },
+        status: { in: ['PAID', 'PROCESSED', 'COMPLETED'] },
       },
     },
     select: { id: true },
@@ -87,6 +96,61 @@ export const addToCart = async (userId: string, productId: string) => {
   return cartItem;
 };
 
+export const syncCart = async (userId: string, productIds: string[]) => {
+  let cart = await prisma.cart.findUnique({ where: { userId } });
+
+  if (!cart) {
+    cart = await prisma.cart.create({ data: { userId } });
+  }
+
+  // Find products already in the cart to avoid duplicates
+  const existingItems = await prisma.cartItem.findMany({
+    where: { cartId: cart.id },
+    select: { productId: true },
+  });
+
+  const existingProductIds = new Set(existingItems.map((item: any) => item.productId));
+
+  // Find products already owned via libraryItem (source of truth)
+  const libraryItems = await prisma.libraryItem.findMany({
+    where: { userId },
+    select: { productId: true },
+  });
+
+  const libraryProductIds = new Set(libraryItems.map((item: any) => item.productId));
+
+  // Fallback: also check via orderItems
+  const ownedItems = await prisma.orderItem.findMany({
+    where: {
+      order: {
+        userId,
+        status: { in: ['PAID', 'PROCESSED', 'COMPLETED'] },
+      },
+    },
+    select: { productId: true },
+  });
+
+  const ownedProductIds = new Set(ownedItems.map((item: any) => item.productId));
+
+  // Filter out products already in cart, in library, or already owned
+  const newProductIds = productIds.filter(
+    (id) => !existingProductIds.has(id) && !libraryProductIds.has(id) && !ownedProductIds.has(id)
+  );
+
+  if (newProductIds.length > 0) {
+    await prisma.cartItem.createMany({
+      data: newProductIds.map((productId) => ({
+        cartId: cart.id,
+        productId,
+        quantity: 1,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  return getCart(userId);
+};
+
 export const removeFromCart = async (userId: string, cartItemId: string) => {
   // Pastikan item yang dihapus milik user yang bersangkutan dengan mengecek relasi ke Cart
   const cartItem = await prisma.cartItem.findUnique({
@@ -108,3 +172,5 @@ export const removeFromCart = async (userId: string, cartItemId: string) => {
 
   return cartItem;
 };
+
+

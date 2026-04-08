@@ -10,11 +10,13 @@ import {
   getProductById,
   updateProduct,
   deleteProduct,
+  getRecommendedProducts,
 } from '../controllers/product.controller.ts';
 
 export const productRouter = express.Router();
 
 productRouter.get('/', getProducts);
+productRouter.get('/recommendations', getRecommendedProducts);
 productRouter.get('/:id', getProductById);
 productRouter.post('/', authMiddleware, requireRole('ADMIN'), uploadImage.single('image'), validate(createProductSchema), createProduct);
 productRouter.put('/:id', authMiddleware, requireRole('ADMIN'), uploadImage.single('image'), validate(updateProductSchema), updateProduct);

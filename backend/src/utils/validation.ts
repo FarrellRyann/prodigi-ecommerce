@@ -17,6 +17,7 @@ export const checkoutSchema = z.object({
 export const registerSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
+  role: z.enum(['ADMIN', 'CUSTOMER']).optional().default('CUSTOMER'),
 });
 
 export const loginSchema = z.object({
@@ -33,27 +34,34 @@ export const updateCategorySchema = z.object({
   name: z.string().min(1, 'Category name is required'),
 });
 
+// Helper: treat empty string the same as null for optional URL fields
+const optionalUrl = (msg: string) =>
+  z.preprocess(
+    (v) => (v === '' || v === undefined ? null : v),
+    z.string().url(msg).nullable().optional()
+  );
+
 // Product
 export const createProductSchema = z.object({
   categoryId: z.string().uuid('Invalid category ID'),
   name: z.string().min(1, 'Product name is required'),
-  description: z.string().optional().nullable(),
+  description: z.preprocess((v) => (v === '' ? null : v), z.string().nullable().optional()),
   price: z.coerce.number().int().positive('Price must be a positive integer'),
   productType: z.enum(['FILE', 'COURSE', 'SUBSCRIPTION']).optional().default('FILE'),
-  imageUrl: z.string().url('Invalid image URL').optional().nullable(),
-  downloadUrl: z.string().url('Invalid download URL').optional().nullable(),
-  accessUrl: z.string().url('Invalid access URL').optional().nullable(),
+  imageUrl: optionalUrl('Invalid image URL'),
+  downloadUrl: optionalUrl('Invalid download URL'),
+  accessUrl: optionalUrl('Invalid access URL'),
 });
 
 export const updateProductSchema = z.object({
   categoryId: z.string().uuid('Invalid category ID').optional(),
   name: z.string().min(1, 'Product name cannot be empty').optional(),
-  description: z.string().optional().nullable(),
+  description: z.preprocess((v) => (v === '' ? null : v), z.string().nullable().optional()),
   price: z.coerce.number().int().positive('Price must be a positive integer').optional(),
   productType: z.enum(['FILE', 'COURSE', 'SUBSCRIPTION']).optional(),
-  imageUrl: z.string().url('Invalid image URL').optional().nullable(),
-  downloadUrl: z.string().url('Invalid download URL').optional().nullable(),
-  accessUrl: z.string().url('Invalid access URL').optional().nullable(),
+  imageUrl: optionalUrl('Invalid image URL'),
+  downloadUrl: optionalUrl('Invalid download URL'),
+  accessUrl: optionalUrl('Invalid access URL'),
 });
 
 // Cart

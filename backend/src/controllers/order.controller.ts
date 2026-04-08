@@ -4,6 +4,53 @@ import * as orderService from '../services/order.service.ts';
 import { isServiceError } from '../services/errors.service.ts';
 import { xenditWebhookSchema } from '../utils/validation.ts';
 
+// Add cancelOrderAdmin and syncOrderStatus
+export const cancelOrderAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const result = await orderService.cancelOrder(id as string);
+    res.status(200).json(result);
+  } catch (error) {
+    if (isServiceError(error)) {
+      res.status(error.statusCode).json({ error: error.message });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to cancel order.' });
+  }
+};
+
+export const syncOrderStatusController = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { id } = req.params;
+    if (!userId) { res.status(401).json({ error: 'Unauthorized.' }); return; }
+    const result = await orderService.syncOrderStatus(id as string, userId);
+    res.status(200).json(result);
+  } catch (error) {
+    if (isServiceError(error)) {
+      res.status(error.statusCode).json({ error: error.message });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to sync order status.' });
+  }
+};
+
+export const cancelOrderUser = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { id } = req.params;
+    if (!userId) { res.status(401).json({ error: 'Unauthorized.' }); return; }
+    const result = await orderService.cancelUserOrder(id as string, userId);
+    res.status(200).json(result);
+  } catch (error) {
+    if (isServiceError(error)) {
+      res.status(error.statusCode).json({ error: error.message });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to cancel order.' });
+  }
+};
+
 type AuthRequest = Request & {
   user?: {
     userId: string;
@@ -72,6 +119,16 @@ export const getOrderById = async (req: AuthRequest, res: Response): Promise<voi
       res.status(error.statusCode).json({ error: error.message });
       return;
     }
+    res.status(500).json({ error: (error as Error).message });
+  }
+};
+
+// ADMIN: Get all orders across all users
+export const getAdminAllOrders = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const orders = await orderService.getAllOrdersAdmin();
+    res.status(200).json({ data: orders });
+  } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
 };

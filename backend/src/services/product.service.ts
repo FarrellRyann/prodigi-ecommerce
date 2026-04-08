@@ -17,6 +17,8 @@ export const createProduct = async (payload: {
   price: number;
   imageUrl?: string | null;
   downloadUrl?: string | null;
+  productType?: string | null;
+  accessUrl?: string | null;
 }) => {
   const category = await prisma.category.findUnique({
     where: { id: payload.categoryId },
@@ -35,6 +37,8 @@ export const createProduct = async (payload: {
       price: payload.price,
       imageUrl: payload.imageUrl ?? null,
       downloadUrl: payload.downloadUrl ?? null,
+      ...(payload.productType ? { productType: payload.productType as any } : {}),
+      accessUrl: payload.accessUrl ?? null,
     },
     include: {
       category: true,
@@ -42,14 +46,26 @@ export const createProduct = async (payload: {
   });
 };
 
-export const getProducts = async () => {
+export const getProducts = async (filters: { categoryId?: string; search?: string } = {}) => {
+  const { categoryId, search } = filters;
+  
   return prisma.product.findMany({
+    where: {
+      ...(categoryId ? { categoryId } : {}),
+      ...(search ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ]
+      } : {}),
+    },
     orderBy: { createdAt: 'desc' },
     include: {
       category: true,
     },
   });
 };
+
 
 export const getProductById = async (id: string) => {
   const product = await prisma.product.findUnique({
@@ -126,3 +142,13 @@ export const deleteProduct = async (id: string) => {
   }
 };
 
+export const getRecommendedProducts = async (limit = 3) => {
+  // Simple randomized logic or latest products
+  return prisma.product.findMany({
+    take: limit,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      category: true,
+    },
+  });
+};

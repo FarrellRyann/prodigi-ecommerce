@@ -3,6 +3,12 @@ import { Geist, Geist_Mono, IBM_Plex_Sans, JetBrains_Mono } from "next/font/goog
 import "@workspace/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@workspace/ui/lib/utils";
+import QueryProvider from "@/providers/QueryProvider";
+import { AuthProvider } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
+import { ToastProvider } from "@/context/ToastContext";
+
+import MainLayoutWrapper from "@/components/MainLayoutWrapper";
 
 const jetbrainsMonoHeading = JetBrains_Mono({subsets:['latin'],variable:'--font-heading'});
 
@@ -24,9 +30,22 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", ibmPlexSans.variable, jetbrainsMonoHeading.variable)}
     >
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
+      <body className="min-h-screen bg-black text-white selection:bg-indigo-500/30">
+        <QueryProvider>
+          <AuthProvider>
+            <CartProvider>
+              <ToastProvider>
+                <ThemeProvider>
+                  <MainLayoutWrapper>
+                    {children}
+                  </MainLayoutWrapper>
+                </ThemeProvider>
+              </ToastProvider>
+            </CartProvider>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
-  )
+  );
 }
+

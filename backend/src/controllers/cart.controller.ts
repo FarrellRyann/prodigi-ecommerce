@@ -81,3 +81,24 @@ export const removeFromCart = async (req: AuthRequest, res: Response): Promise<v
     res.status(500).json({ error: (error as Error).message });
   }
 };
+export const syncCart = async (req: AuthRequest, res: Response): Promise<void> => {
+	try {
+		const userId = req.user?.userId;
+		const { productIds } = req.body;
+
+		if (!userId) {
+			res.status(401).json({ error: 'Unauthorized.' });
+			return;
+		}
+
+		if (!Array.isArray(productIds)) {
+			res.status(400).json({ error: 'productIds must be an array.' });
+			return;
+		}
+
+		const cart = await cartService.syncCart(userId, productIds);
+		res.status(200).json({ message: 'Cart synchronized.', data: cart });
+	} catch (error) {
+		res.status(500).json({ error: (error as Error).message });
+	}
+};

@@ -8,6 +8,9 @@ type ProductPayload = {
   description?: string | null;
   price?: number;
   imageUrl?: string | null;
+  downloadUrl?: string | null;
+  productType?: string | null;
+  accessUrl?: string | null;
 };
 
 const validateNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
@@ -29,7 +32,7 @@ const getParamId = (req: Request) => {
 };
 
 const createProduct = async (req: Request, res: Response) => {
-  const { categoryId, name, description, price, imageUrl } = req.body as ProductPayload;
+  const { categoryId, name, description, price, imageUrl, downloadUrl, productType, accessUrl } = req.body as ProductPayload;
   const requestWithFile = req as Request & { file?: Express.Multer.File };
 
   if (!categoryId || !name?.trim()) {
@@ -56,6 +59,9 @@ const createProduct = async (req: Request, res: Response) => {
       description: description ?? null,
       price: safePrice,
       imageUrl: uploadedImageUrl ?? imageUrl ?? null,
+      downloadUrl: downloadUrl ?? null,
+      productType: productType ?? undefined,
+      accessUrl: accessUrl ?? null,
     });
 
     return res.status(201).json(product);
@@ -66,13 +72,20 @@ const createProduct = async (req: Request, res: Response) => {
       return res.status(serviceError.statusCode).json({ error: serviceError.message });
     }
 
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("[createProduct] Prisma error:", msg);
     return res.status(500).json({ error: 'Failed to create product.' });
   }
 };
 
-const getProducts = async (_req: Request, res: Response) => {
+const getProducts = async (req: Request, res: Response) => {
   try {
-    const products = await productService.getProducts();
+    const { categoryId, search } = req.query;
+
+    const products = await productService.getProducts({
+      categoryId: typeof categoryId === 'string' ? categoryId : undefined,
+      search: typeof search === 'string' ? search : undefined,
+    });
 
     return res.json(products);
   } catch (error) {
@@ -84,6 +97,7 @@ const getProducts = async (_req: Request, res: Response) => {
     return res.status(500).json({ error: 'Failed to fetch products.' });
   }
 };
+
 
 const getProductById = async (req: Request, res: Response) => {
   const id = getParamId(req);
@@ -166,4 +180,13 @@ const deleteProduct = async (req: Request, res: Response) => {
   }
 };
 
-export { createProduct, getProducts, getProductById, updateProduct, deleteProduct };
+const getRecommendedProducts = async (_req: Request, res: Response) => {
+  try {
+    const products = await productService.getRecommendedProducts(3);
+    return res.json(products);
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to fetch recommendations.' });
+  }
+};
+
+export { createProduct, getProducts, getProductById, updateProduct, deleteProduct, getRecommendedProducts };

@@ -72,8 +72,11 @@ export const createOrderFromCart = async (userId: string, userEmail: string) => 
       externalId: order.id,
       amount: totalAmount,
       payerEmail: userEmail,
-      description: `Pembelian Produk Digital dari E-Commerce Anda`,
+      description: `Pembelian Produk Digital dari .prodigi`,
+      successRedirectUrl: `${env.FRONTEND_URL}/order/success?orderId=${order.id}`,
+      failureRedirectUrl: `${env.FRONTEND_URL}/order/failed?orderId=${order.id}`,
     };
+
 
     // Panggil Xendit SDK secara async di dalam blok (Perlu ditangani dengan await secara perlahan)
     const invoiceResponse = await invoiceClient.createInvoice({
@@ -401,3 +404,153 @@ export const resendOrderEmail = async (userId: string, orderId: string, userEmai
   });
 };
 
+export const getAllOrdersAdmin = async () => {
+  const orders = await prisma.order.findMany({
+    include: {
+      user: { select: { id: true, email: true } },
+      items: { include: { product: { select: { id: true, name: true } } } },
+      payment: { select: { status: true, paidAt: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  return orders;
+};
+
+
+// ADMIN: Cancel an order (only PENDING orders)
+export const cancelOrder = async (orderId: string) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payment: true },
+  });
+
+  if (!order) throw new ServiceError('Order not found.', 404);
+  if (order.status === 'PAID' || order.status === 'COMPLETED') {
+    throw new ServiceError('Cannot cancel a paid or completed order.', 400);
+  }
+
+  await prisma.$transaction(async (tx: any) => {
+    await tx.order.update({
+      where: { id: orderId },
+      data: { status: 'CANCELLED' },
+    });
+    if (order.payment) {
+      await tx.payment.update({
+        where: { id: order.payment.id },
+        data: { status: 'CANCELLED' },
+      });
+    }
+  });
+
+  return { message: 'Order cancelled successfully.', orderId };
+};
+
+// USER: Cancel own pending order
+export const cancelUserOrder = async (orderId: string, userId: string) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payment: true },
+  });
+
+  if (!order) throw new ServiceError('Order not found.', 404);
+  if (order.userId !== userId) throw new ServiceError('Unauthorized.', 403);
+  if (order.status === 'PAID' || order.status === 'COMPLETED') {
+    throw new ServiceError('Cannot cancel a paid or completed order.', 400);
+  }
+  if (order.status === 'CANCELLED') {
+    return { message: 'Order is already cancelled.', orderId };
+  }
+
+  // Try to expire the Xendit invoice so it can't be paid after cancellation
+  if (order.payment?.invoiceId) {
+    try {
+      await invoiceClient.expireInvoice({ invoiceId: order.payment.invoiceId });
+    } catch (err) {
+      console.error('[cancelUserOrder] Failed to expire Xendit invoice:', err);
+      // Continue with local cancellation even if Xendit API fails
+    }
+  }
+
+  await prisma.$transaction(async (tx: any) => {
+    await tx.order.update({
+      where: { id: orderId },
+      data: { status: 'CANCELLED' },
+    });
+    if (order.payment) {
+      await tx.payment.update({
+        where: { id: order.payment.id },
+        data: { status: 'CANCELLED' },
+      });
+    }
+  });
+
+  return { message: 'Order cancelled successfully.', orderId };
+};
+
+// USER: Proactively sync order status from Xendit (for local dev where webhook can't reach)
+// Checks actual Xendit invoice status and runs fulfillment if PAID
+export const syncOrderStatus = async (orderId: string, userId: string) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      payment: true,
+      user: true,
+      items: { include: { product: true } },
+    },
+  });
+
+  if (!order) throw new ServiceError('Order not found.', 404);
+  if (order.userId !== userId) throw new ServiceError('Unauthorized.', 403);
+
+  // Already processed
+  if (order.status === 'PAID' || order.status === 'COMPLETED') {
+    return { status: order.status, message: 'Order already processed.' };
+  }
+
+  if (!order.payment?.invoiceId) {
+    console.warn('[syncOrderStatus] No invoiceId found for order:', orderId);
+    return { status: order.status, message: 'No payment record found.' };
+  }
+
+  console.log(`[syncOrderStatus] Calling Xendit for invoiceId: ${order.payment.invoiceId}`);
+
+  // Call Xendit API to get invoice status
+  let invoiceData: any;
+  try {
+    invoiceData = await invoiceClient.getInvoiceById({ invoiceId: order.payment.invoiceId });
+    console.log(`[syncOrderStatus] Xendit response for order ${orderId}:`, JSON.stringify({
+      id: invoiceData?.id,
+      status: invoiceData?.status,
+      paid_at: invoiceData?.paidAt,
+      paid_amount: invoiceData?.paidAmount,
+    }));
+  } catch (err) {
+    console.error('[syncOrderStatus] Xendit API error:', err);
+    return { status: order.status, message: 'Could not reach payment provider.' };
+  }
+
+  if (invoiceData?.status === 'PAID' || invoiceData?.status === 'SETTLED') {
+    console.log(`[syncOrderStatus] Fulfilling order ${orderId} with Xendit status: ${invoiceData.status}`);
+    // Run the same fulfillment logic as the webhook handler
+    await handleXenditInvoiceWebhook(env.XENDIT_CALLBACK_TOKEN, {
+      id: invoiceData.id,
+      external_id: order.id,
+      status: 'PAID', // normalize to PAID
+      paid_amount: invoiceData.paidAmount,
+      paid_at: invoiceData.paidAt,
+      invoice_url: invoiceData.invoiceUrl,
+    });
+    return { status: 'PAID', message: 'Payment confirmed and library updated.' };
+  }
+
+  if (invoiceData?.status === 'EXPIRED') {
+    await prisma.$transaction(async (tx: any) => {
+      await tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
+      await tx.payment.update({ where: { id: order.payment!.id }, data: { status: 'EXPIRED' } });
+    });
+    return { status: 'CANCELLED', message: 'Invoice expired.' };
+  }
+
+  console.warn(`[syncOrderStatus] Unhandled Xendit status "${invoiceData?.status}" for order ${orderId}`);
+  return { status: order.status, message: `Xendit status: ${invoiceData?.status ?? 'unknown'}` };
+};

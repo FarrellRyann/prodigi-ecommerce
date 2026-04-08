@@ -1,24 +1,26 @@
 // src/routes/order.routes.ts
 import express from 'express';
-import { checkout, getOrders, getOrderById, handleXenditWebhook, resendOrderEmail } from '../controllers/order.controller.ts';
+import { checkout, getOrders, getOrderById, handleXenditWebhook, resendOrderEmail, getAdminAllOrders, cancelOrderAdmin, syncOrderStatusController, cancelOrderUser } from '../controllers/order.controller.ts';
 import { authMiddleware } from '../middleware/authMiddleware.ts';
+import { requireRole } from '../middleware/roleMiddleware.ts';
 
 export const orderRouter = express.Router();
 
-// Endpoint webhook publik dari Xendit
+// Endpoint webhook publik dari Xendit (no auth)
 orderRouter.post('/webhook/xendit', handleXenditWebhook);
 
 // Middleware Proteksi
 orderRouter.use(authMiddleware);
 
-// Endpoint: POST /orders/checkout (Merubah Cart menjadi Invoice Xendit)
+// ADMIN Endpoints
+orderRouter.get('/admin/all', requireRole('ADMIN'), getAdminAllOrders);
+orderRouter.patch('/admin/:id/cancel', requireRole('ADMIN'), cancelOrderAdmin);
+
+// USER Endpoints
 orderRouter.post('/checkout', checkout);
-
-// Endpoint: GET /orders (Riwayat Belanja User)
 orderRouter.get('/', getOrders);
-
-// Endpoint: GET /orders/:id (Detail Pesanan Tunggal)
 orderRouter.get('/:id', getOrderById);
-
-// Endpoint: POST /orders/:orderId/resend-email (Kirim ulang email sukses pembayaran)
+orderRouter.post('/:id/sync', syncOrderStatusController);
+orderRouter.patch('/:id/cancel', cancelOrderUser);
 orderRouter.post('/:orderId/resend-email', resendOrderEmail);
+
