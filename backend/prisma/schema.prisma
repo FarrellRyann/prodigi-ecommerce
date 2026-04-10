@@ -25,6 +25,7 @@ enum ProductType {
   FILE
   COURSE
   SUBSCRIPTION
+  LICENSE_KEY
 }
 
 enum OrderStatus {
@@ -51,16 +52,18 @@ enum SubscriptionStatus {
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
+  username  String?  @unique
   password  String
   role      Role     @default(CUSTOMER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  cart   Cart?
-  orders Order[]
-  libraryItems LibraryItem[]
+  cart          Cart?
+  orders        Order[]
+  libraryItems  LibraryItem[]
   subscriptions Subscription[]
+  products      Product[]     @relation("admin") // Products created by this admin
 }
 
 //Category 
@@ -77,22 +80,25 @@ model Category {
 model Product {
   id          String      @id @default(uuid())
   categoryId  String
+  adminId     String?     // FK to User (admin who created this product)
   name        String
   description String?
   price       Int
   productType ProductType @default(FILE)
+  tags        String[]    @default([])
   imageUrl    String?
-  downloadUrl String?
+  downloadUrl String?     // For FILE type
   accessUrl   String?     // For COURSE or SUBSCRIPTION external links
-  accessExpiryDays Int?   // Optional time-limited access (days). Null => perpetual access
+  accessExpiryDays Int?   // Optional time-limited access (days). Null => perpetual
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   // Relations
-  category   Category   @relation(fields: [categoryId], references: [id])
-  cartItems  CartItem[]
-  orderItems OrderItem[]
-  libraryItems LibraryItem[]
+  category      Category    @relation(fields: [categoryId], references: [id])
+  admin         User?       @relation("admin", fields: [adminId], references: [id])
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  libraryItems  LibraryItem[]
   subscriptions Subscription[]
 }
 
@@ -185,6 +191,9 @@ model LibraryItem {
 
   purchasedAt DateTime
   expiresAt   DateTime? // null => perpetual
+
+  // For LICENSE_KEY type: generated unique key at purchase time
+  licenseKey String?   @unique
 
   // Snapshots help prevent access URLs changing after purchase.
   accessUrlSnapshot   String?

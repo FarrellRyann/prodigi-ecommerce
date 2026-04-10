@@ -23,12 +23,14 @@ interface Product {
   id: string; name: string; description: string; price: number;
   imageUrl: string | null; productType: string; category: Category;
   downloadUrl?: string | null; accessUrl?: string | null;
+  tags: string[];
 }
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
-  FILE:         { label: "Digital Download", color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20" },
-  COURSE:       { label: "Live Course",       color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
-  SUBSCRIPTION: { label: "Membership",        color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+  FILE:        { label: "Digital Download", color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20" },
+  COURSE:      { label: "Live Course",      color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
+  SUBSCRIPTION:{ label: "Membership",       color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+  LICENSE_KEY: { label: "License Key",      color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
 };
 
 const INCLUDES = [
@@ -166,6 +168,24 @@ export default function ProductDetailPage() {
                 {product.description || "Unlock the full potential of your creative workflow with this premium digital asset. Crafted with precision for modern artists and developers."}
               </p>
             </div>
+
+            {/* Tags */}
+            {product.tags?.length > 0 && (
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-600 mb-3">Tags</p>
+                <div className="flex flex-wrap gap-2">
+                  {product.tags.map(tag => (
+                    <Link
+                      key={tag}
+                      href={`/shop?tag=${encodeURIComponent(tag)}`}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06] text-[10px] font-bold text-gray-500 uppercase tracking-wide hover:text-indigo-400 hover:border-indigo-500/20 transition-all"
+                    >
+                      <Tag className="w-2.5 h-2.5" />{tag}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* What's Included */}
             <div>

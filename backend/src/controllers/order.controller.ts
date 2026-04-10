@@ -77,12 +77,13 @@ export const checkout = async (req: AuthRequest, res: Response): Promise<void> =
     });
   } catch (error) {
     const message = (error as Error).message;
+    console.error('[checkout] Error:', message);
     if (message === 'Keranjang belanja Anda kosong.') {
       res.status(400).json({ error: message });
       return;
     }
-    console.error('[Error di Order Controller]:', error); // Logger debugging Xendit Error
-    res.status(500).json({ error: 'Checkout gagal, periksa kembali pesanan Anda.' });
+    // Pass through service-level errors (e.g. Xendit failed)
+    res.status(500).json({ error: message || 'Checkout gagal, periksa kembali pesanan Anda.' });
   }
 };
 
@@ -123,10 +124,12 @@ export const getOrderById = async (req: AuthRequest, res: Response): Promise<voi
   }
 };
 
-// ADMIN: Get all orders across all users
+// ADMIN: Get all orders scoped to admin's products
 export const getAdminAllOrders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const orders = await orderService.getAllOrdersAdmin();
+    const adminId = req.user?.userId;
+    if (!adminId) { res.status(401).json({ error: 'Unauthorized.' }); return; }
+    const orders = await orderService.getAllOrdersAdmin(adminId);
     res.status(200).json({ data: orders });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });

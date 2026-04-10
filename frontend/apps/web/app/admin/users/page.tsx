@@ -24,6 +24,7 @@ import { formatIDR } from "@/lib/currency";
 interface UserRecord {
   id: string;
   email: string;
+  username: string | null;
   role: "CUSTOMER" | "ADMIN";
   createdAt: string;
   orderCount: number;
@@ -54,9 +55,9 @@ export default function CustomerBasePage() {
   const [sortBy, setSortBy]         = useState<"joined" | "orders" | "spent">("joined");
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery<{ data: UserRecord[] }>({
-    queryKey: ["admin", "users", "all"],
+    queryKey: ["admin", "customers"],
     queryFn: async () => {
-      const res = await api.get("/auth/admin/users");
+      const res = await api.get("/auth/admin/customers");
       return res.data;
     },
   });
@@ -67,7 +68,7 @@ export default function CustomerBasePage() {
   const filtered = users
     .filter(u => {
       const q = search.toLowerCase();
-      const matchSearch = u.email.toLowerCase().includes(q) || u.id.toLowerCase().includes(q);
+      const matchSearch = u.email.toLowerCase().includes(q) || u.id.toLowerCase().includes(q) || (u.username ?? "").toLowerCase().includes(q);
       const matchRole   = roleFilter === "All" || u.role === roleFilter;
       return matchSearch && matchRole;
     })
@@ -113,6 +114,7 @@ export default function CustomerBasePage() {
               <h1 className="text-4xl font-black text-white tracking-tighter">
                 Customer <span className="text-amber-500 italic">Base.</span>
               </h1>
+              <p className="text-[11px] text-gray-600 font-bold">Users who have purchased your products</p>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -259,7 +261,7 @@ export default function CustomerBasePage() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-white truncate">{user.email}</p>
-                        <p className="text-[10px] text-gray-600 font-mono">{user.id.slice(0, 8)}…</p>
+                        <p className="text-[10px] text-gray-600 font-mono">{user.username ? `@${user.username}` : user.id.slice(0, 8) + '…'}</p>
                       </div>
                     </div>
 

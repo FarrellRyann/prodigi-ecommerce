@@ -8,13 +8,10 @@ import {
   ShoppingBag, 
   Users, 
   BarChart3, 
-  Settings, 
   Package, 
   Layers, 
   ArrowLeft,
-  Search,
   Zap,
-  Bell
 } from "lucide-react";
 import Logo from "./Logo";
 import { cn } from "@workspace/ui/lib/utils";
@@ -26,11 +23,6 @@ const NAV_ITEMS = [
   { icon: <Layers size={20} />, label: "Categories", href: "/admin/categories" },
   { icon: <Users size={20} />, label: "Customer Base", href: "/admin/users" },
   { icon: <BarChart3 size={20} />, label: "Analytics", href: "/admin/analytics" },
-];
-
-const SECONDARY_ITEMS = [
-  { icon: <Settings size={20} />, label: "Node Settings", href: "/admin/settings" },
-  { icon: <Bell size={20} />, label: "Notifications", href: "/admin/notifications" },
 ];
 
 export default function AdminSidebar() {
@@ -46,18 +38,6 @@ export default function AdminSidebar() {
             .prodigi
           </span>
         </Link>
-
-        {/* Search Bar Nexus Style */}
-        <div className="w-full relative group">
-          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-gray-600 group-hover:text-indigo-500 transition-colors">
-            <Search size={14} />
-          </div>
-          <input 
-            type="text" 
-            placeholder="Search Network..." 
-            className="w-full bg-white/[0.03] border border-white/5 rounded-xl py-2.5 pl-11 pr-4 text-[11px] font-bold tracking-widest uppercase text-white placeholder:text-gray-600 focus:outline-none focus:border-indigo-500/50 focus:bg-white/[0.06] transition-all"
-          />
-        </div>
       </div>
 
       {/* Main Navigation */}
@@ -90,30 +70,7 @@ export default function AdminSidebar() {
           );
         })}
 
-        <div className="px-4 mt-10 mb-4 text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">Management</div>
-        {SECONDARY_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link 
-              key={item.href} 
-              href={item.href}
-              className={cn(
-                "flex items-center gap-4 px-4 py-3 rounded-xl transition-all group",
-                isActive 
-                  ? "bg-indigo-600 text-white" 
-                  : "text-gray-500 hover:text-white hover:bg-white/5"
-              )}
-            >
-              <span className={cn(
-                "transition-transform group-hover:scale-110 duration-300",
-                isActive ? "text-white" : "text-gray-600 group-hover:text-indigo-400"
-              )}>
-                {item.icon}
-              </span>
-              <span className="text-xs font-bold uppercase tracking-widest">{item.label}</span>
-            </Link>
-          );
-        })}
+        <div className="pt-4" />
       </div>
 
       {/* Sidebar Footer */}

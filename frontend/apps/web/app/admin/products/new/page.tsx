@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, KeyboardEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import AdminSidebar from "@/components/AdminSidebar";
@@ -29,6 +29,7 @@ const PRODUCT_TYPES = [
   { value: "FILE", label: "Digital Download", desc: "Downloadable file (ZIP, PDF, etc.)" },
   { value: "COURSE", label: "Live Course", desc: "Access to video or live content" },
   { value: "SUBSCRIPTION", label: "Membership", desc: "Recurring subscription access" },
+  { value: "LICENSE_KEY", label: "License Key", desc: "Software / app activation key" },
 ];
 
 function FormField({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
@@ -79,6 +80,9 @@ export default function NewProductPage() {
     downloadUrl: "",
   });
 
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -114,6 +118,7 @@ export default function NewProductPage() {
       const data = new FormData();
       Object.entries(formData).forEach(([k, v]) => data.append(k, v));
       if (imageFile) data.append("image", imageFile);
+      data.append("tags", tags.join(","));
 
       await api.post("/products", data, { headers: { "Content-Type": "multipart/form-data" } });
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
@@ -241,24 +246,71 @@ export default function NewProductPage() {
                   />
                 </FormField>
 
+                {/* Tags */}
+                <FormField label="Tags">
+                  <div className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 focus-within:border-indigo-500/50 transition-all">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {tags.map(tag => (
+                        <span key={tag} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-black uppercase tracking-widest text-indigo-300">
+                          <Tag size={9} />{tag}
+                          <button type="button" onClick={() => setTags(t => t.filter(x => x !== tag))} className="text-indigo-400 hover:text-red-400 transition-colors">
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={tags.length === 0 ? "Type a tag and press Enter or comma…" : "Add another…"}
+                      value={tagInput}
+                      onChange={e => setTagInput(e.target.value)}
+                      onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+                        if (e.key === "Enter" || e.key === ",") {
+                          e.preventDefault();
+                          const val = tagInput.trim().toLowerCase().replace(/,/g, "");
+                          if (val && !tags.includes(val)) setTags(t => [...t, val]);
+                          setTagInput("");
+                        } else if (e.key === "Backspace" && tagInput === "" && tags.length > 0) {
+                          setTags(t => t.slice(0, -1));
+                        }
+                      }}
+                      className="w-full bg-transparent text-sm font-medium text-white placeholder:text-gray-700 focus:outline-none"
+                    />
+                  </div>
+                  <p className="text-[9px] text-gray-700 mt-1">Press Enter or comma to add a tag. Tags help users discover your product.</p>
+                </FormField>
+
                 {/* Fulfillment URL */}
                 <div className="p-6 rounded-3xl bg-indigo-600/5 border border-indigo-500/10 space-y-4">
                   <div className="flex items-center gap-2">
                     <Sparkles size={14} className="text-indigo-400" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-white">Fulfillment Details</span>
                   </div>
-                  <FormField label="Asset Delivery URL" required>
-                    <div className="relative">
-                      <LinkIcon size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" />
-                      <InputBase
-                        placeholder="https://storage.example.com/your-asset.zip"
-                        value={formData.downloadUrl}
-                        onChange={update("downloadUrl")}
-                        className="pl-10"
-                        required
-                      />
+
+                  {formData.productType === "LICENSE_KEY" ? (
+                    <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/15">
+                      <span className="text-emerald-400 mt-0.5 text-lg">🔑</span>
+                      <div>
+                        <p className="text-xs font-black text-emerald-300 mb-1">Auto-Generated License Key</p>
+                        <p className="text-[10px] text-gray-500 leading-relaxed">
+                          A unique license key will be automatically generated and delivered to the buyer upon successful payment. No download link needed.
+                        </p>
+                      </div>
                     </div>
-                  </FormField>
+                  ) : (
+                    <FormField label="Asset Delivery URL" required>
+                      <div className="relative">
+                        <LinkIcon size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" />
+                        <InputBase
+                          placeholder="https://storage.example.com/your-asset.zip"
+                          value={formData.downloadUrl}
+                          onChange={update("downloadUrl")}
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </FormField>
+                  )}
                 </div>
 
                 {/* Error / Success */}
@@ -362,7 +414,10 @@ export default function NewProductPage() {
                     { label: "Product name set", done: !!formData.name },
                     { label: "Price defined", done: !!formData.price },
                     { label: "Category selected", done: !!formData.categoryId },
-                    { label: "Delivery URL added", done: !!formData.downloadUrl },
+                    ...(formData.productType === "LICENSE_KEY"
+                      ? [{ label: "License key (auto-generated)", done: true }]
+                      : [{ label: "Delivery URL added", done: !!formData.downloadUrl }]
+                    ),
                     { label: "Cover image uploaded", done: !!imageFile },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2.5">

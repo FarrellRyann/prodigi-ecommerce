@@ -27,7 +27,7 @@ const createToken = (user: { id: string; email: string; role: string }) => {
 };
 
 export const register = async (req: Request, res: Response) => {
-  const { email, password, role } = req.body as { email?: string; password?: string; role?: string };
+  const { email, password, role, username } = req.body as { email?: string; password?: string; role?: string; username?: string };
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
@@ -37,17 +37,24 @@ export const register = async (req: Request, res: Response) => {
     const assignedRole = (role === 'ADMIN' || role === 'CUSTOMER') ? role : 'CUSTOMER';
     const normalizedEmail = email.trim().toLowerCase();
 
+    // Auto-generate username from email prefix if not provided
+    const rawUsername = username?.trim() || normalizedEmail.split('@')[0];
+    // Ensure uniqueness by appending random suffix if plain prefix is taken
+    const baseUsername = rawUsername.toLowerCase().replace(/[^a-z0-9_]/g, '');
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
+        username: baseUsername || normalizedEmail.split('@')[0],
         password: hashedPassword,
         role: assignedRole,
       },
       select: {
         id: true,
         email: true,
+        username: true,
         role: true,
         createdAt: true,
       },
@@ -55,9 +62,11 @@ export const register = async (req: Request, res: Response) => {
 
     return res.status(201).json({ user });
   } catch (error: unknown) {
-    const prismaError = error as { code?: string; message?: string };
+    const prismaError = error as { code?: string; message?: string; meta?: any };
 
     if (prismaError?.code === 'P2002') {
+      const field = prismaError.meta?.target?.[0] ?? 'field';
+      if (field === 'username') return res.status(409).json({ error: 'Username already taken. Please choose another.' });
       return res.status(409).json({ error: 'Email already registered.' });
     }
 
@@ -133,6 +142,7 @@ export const me = async (req: AuthRequest, res: Response) => {
       select: {
         id: true,
         email: true,
+        username: true,
         role: true,
         createdAt: true,
       },
@@ -161,6 +171,7 @@ export const getAdminAllUsers = async (req: AuthRequest, res: Response) => {
       select: {
         id: true,
         email: true,
+        username: true,
         role: true,
         createdAt: true,
         _count: { select: { orders: true } },
@@ -175,6 +186,7 @@ export const getAdminAllUsers = async (req: AuthRequest, res: Response) => {
     const result = users.map((u: any) => ({
       id: u.id,
       email: u.email,
+      username: u.username,
       role: u.role,
       createdAt: u.createdAt,
       orderCount: u._count.orders,
@@ -185,6 +197,55 @@ export const getAdminAllUsers = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('[getAdminAllUsers]', error);
     return res.status(500).json({ error: 'Failed to fetch users.' });
+  }
+};
+
+// ADMIN: Get customers who bought at least one product owned by this admin
+export const getAdminCustomers = async (req: AuthRequest, res: Response) => {
+  if (!req.user?.userId) return res.status(401).json({ error: 'Unauthorized.' });
+  const adminId = req.user.userId;
+
+  try {
+    // Find all orders containing a product visible to this admin
+    // (created by this admin OR legacy products with null adminId)
+    const orders = await prisma.order.findMany({
+      where: {
+        status: { in: ['PAID', 'COMPLETED'] },
+        items: {
+          some: {
+            product: { adminId: adminId },  // STRICT: only this admin's products
+          },
+        },
+      },
+      select: {
+        userId: true,
+        totalAmount: true,
+        user: {
+          select: { id: true, email: true, username: true, role: true, createdAt: true },
+        },
+      },
+    });
+
+    // Aggregate by userId
+    const customerMap = new Map<string, any>();
+    for (const o of orders) {
+      const existing = customerMap.get(o.userId);
+      if (existing) {
+        existing.totalSpent += o.totalAmount;
+        existing.orderCount += 1;
+      } else {
+        customerMap.set(o.userId, {
+          ...o.user,
+          orderCount: 1,
+          totalSpent: o.totalAmount,
+        });
+      }
+    }
+
+    return res.status(200).json({ data: Array.from(customerMap.values()) });
+  } catch (error) {
+    console.error('[getAdminCustomers]', error);
+    return res.status(500).json({ error: 'Failed to fetch customers.' });
   }
 };
 // User: Get own profile with stats
@@ -199,6 +260,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
       select: {
         id: true,
         email: true,
+        username: true,
         role: true,
         createdAt: true,
         _count: { select: { orders: true, libraryItems: true } },
@@ -234,6 +296,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
     return res.json({
       id: user.id,
       email: user.email,
+      username: user.username,
       role: user.role,
       createdAt: user.createdAt,
       orderCount: user._count.orders,
@@ -244,5 +307,30 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('[getProfile]', error);
     return res.status(500).json({ error: 'Failed to fetch profile.' });
+  }
+};
+
+// User: Update username
+export const updateUsername = async (req: AuthRequest, res: Response) => {
+  if (!req.user?.userId) return res.status(401).json({ error: 'Unauthorized.' });
+  const { username } = req.body as { username?: string };
+
+  if (!username?.trim()) return res.status(400).json({ error: 'Username is required.' });
+
+  const clean = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+  if (clean.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters.' });
+  if (clean.length > 30) return res.status(400).json({ error: 'Username must be 30 characters or fewer.' });
+
+  try {
+    const updated = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { username: clean },
+      select: { id: true, email: true, username: true, role: true },
+    });
+    return res.json(updated);
+  } catch (error: unknown) {
+    const pe = error as { code?: string };
+    if (pe?.code === 'P2002') return res.status(409).json({ error: 'Username already taken.' });
+    return res.status(500).json({ error: 'Failed to update username.' });
   }
 };

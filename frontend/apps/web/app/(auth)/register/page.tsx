@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function RegisterPage() {
   const { register } = useAuth();
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<"CUSTOMER" | "ADMIN">("CUSTOMER");
@@ -30,7 +31,7 @@ export default function RegisterPage() {
     setLoading(true);
     setError("");
     try {
-      await register({ email, password, role });
+      await register({ email, password, role, username: username || undefined });
     } catch (err: any) {
       setError(err.response?.data?.error || "Registration failed. Please try again.");
     } finally {
@@ -143,6 +144,14 @@ export default function RegisterPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    className="rounded-2xl border-white/5 bg-white/[0.03] focus:bg-white/[0.06]"
+                  />
+                  <GlassInput
+                    label="Username (optional)"
+                    type="text"
+                    placeholder={email ? (email.split('@')[0] ?? '').toLowerCase() : "e.g. alex_prodigi"}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.replace(/[^a-z0-9_]/gi, '').toLowerCase())}
                     className="rounded-2xl border-white/5 bg-white/[0.03] focus:bg-white/[0.06]"
                   />
                   <GlassInput

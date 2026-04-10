@@ -8,6 +8,7 @@ type ProductPayload = {
   price?: number;
   imageUrl?: string | null;
   downloadUrl?: string | null;
+  tags?: string[];
 };
 
 export const createProduct = async (payload: {
@@ -19,6 +20,8 @@ export const createProduct = async (payload: {
   downloadUrl?: string | null;
   productType?: string | null;
   accessUrl?: string | null;
+  tags?: string[];
+  adminId?: string | null;
 }) => {
   const category = await prisma.category.findUnique({
     where: { id: payload.categoryId },
@@ -39,15 +42,15 @@ export const createProduct = async (payload: {
       downloadUrl: payload.downloadUrl ?? null,
       ...(payload.productType ? { productType: payload.productType as any } : {}),
       accessUrl: payload.accessUrl ?? null,
+      tags: payload.tags ?? [],
+      ...(payload.adminId ? { adminId: payload.adminId } : {}),
     },
-    include: {
-      category: true,
-    },
+    include: { category: true },
   });
 };
 
-export const getProducts = async (filters: { categoryId?: string; search?: string } = {}) => {
-  const { categoryId, search } = filters;
+export const getProducts = async (filters: { categoryId?: string; search?: string; adminId?: string } = {}) => {
+  const { categoryId, search, adminId } = filters;
   
   return prisma.product.findMany({
     where: {
@@ -58,11 +61,11 @@ export const getProducts = async (filters: { categoryId?: string; search?: strin
           { description: { contains: search, mode: 'insensitive' } },
         ]
       } : {}),
+      // Strict admin scoping: only this admin's products (no legacy null fallback)
+      ...(adminId ? { adminId: adminId } : {}),
     },
     orderBy: { createdAt: 'desc' },
-    include: {
-      category: true,
-    },
+    include: { category: true },
   });
 };
 
@@ -82,14 +85,19 @@ export const getProductById = async (id: string) => {
   return product;
 };
 
-export const updateProduct = async (id: string, payload: ProductPayload) => {
+export const updateProduct = async (id: string, payload: ProductPayload, requestingAdminId?: string) => {
   const existingProduct = await prisma.product.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, adminId: true },
   });
 
   if (!existingProduct) {
     throw new ServiceError('Product not found.', 404);
+  }
+
+  // Ownership check: only the creating admin can update
+  if (existingProduct.adminId && requestingAdminId && existingProduct.adminId !== requestingAdminId) {
+    throw new ServiceError('You do not have permission to update this product.', 403);
   }
 
   if (payload.categoryId) {
@@ -112,21 +120,25 @@ export const updateProduct = async (id: string, payload: ProductPayload) => {
       ...(payload.price !== undefined ? { price: payload.price } : {}),
       ...(payload.imageUrl !== undefined ? { imageUrl: payload.imageUrl } : {}),
       ...(payload.downloadUrl !== undefined ? { downloadUrl: payload.downloadUrl } : {}),
+      ...(payload.tags !== undefined ? { tags: payload.tags } : {}),
     },
-    include: {
-      category: true,
-    },
+    include: { category: true },
   });
 };
 
-export const deleteProduct = async (id: string) => {
+export const deleteProduct = async (id: string, requestingAdminId?: string) => {
   const existingProduct = await prisma.product.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, adminId: true },
   });
 
   if (!existingProduct) {
     throw new ServiceError('Product not found.', 404);
+  }
+
+  // Ownership check: only the creating admin can delete
+  if (existingProduct.adminId && requestingAdminId && existingProduct.adminId !== requestingAdminId) {
+    throw new ServiceError('You do not have permission to delete this product.', 403);
   }
 
   try {

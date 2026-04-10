@@ -55,8 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     await api.post("/auth/logout");
     setUser(null);
-    router.refresh(); // Refresh layout to update navbar etc.
-    router.push("/login");
+    // Force a hard reload to completely wipe React Query's in-memory cache
+    window.location.href = "/login";
   };
 
   useEffect(() => {

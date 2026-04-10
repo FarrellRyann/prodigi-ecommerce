@@ -23,6 +23,7 @@ export const getUserLibrary = async (userId: string) => {
           description: true,
           imageUrl: true,
           productType: true,
+          tags: true,
         },
       },
     },
@@ -70,6 +71,7 @@ export const getUserLibrary = async (userId: string) => {
       purchasedAt: li.purchasedAt,
       expiresAt: li.expiresAt,
       isExpired: !!li.expiresAt && li.expiresAt.getTime() < now.getTime(),
+      licenseKey: li.licenseKey ?? null,
       product: li.product,
     });
   }

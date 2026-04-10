@@ -4,7 +4,7 @@ import { Xendit } from 'xendit-node';
 import { ServiceError } from './errors.service.ts';
 import { sendPaymentSuccessEmail } from './notification.service.ts';
 import { env } from '../config/env.ts';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, randomBytes } from 'node:crypto';
 
 // Pastikan Secret Key diset di .env
 const xendit = new Xendit({
@@ -39,18 +39,13 @@ export const createOrderFromCart = async (userId: string, userEmail: string) => 
     totalAmount += item.product.price * item.quantity;
   });
 
-  // 3. Gunakan Prisma Transaction untuk memastikan kelancaran pembuatan data
-  const result = await prisma.$transaction(async (tx: any) => {
-    // 3A. Buat Order Baru
+  // 3. Buat Order + OrderItems + kosongkan cart dalam satu transaction
+  //    NOTE: Xendit call ada di LUAR transaction ini untuk menghindari timeout
+  const { order } = await prisma.$transaction(async (tx: any) => {
     const order = await tx.order.create({
-      data: {
-        userId,
-        totalAmount,
-        status: 'PENDING',
-      },
+      data: { userId, totalAmount, status: 'PENDING' },
     });
 
-    // 3B. Pindahkan CartItem ke OrderItem
     const orderItemsData = cart.items.map((cartItem: any) => ({
       orderId: order.id,
       productId: cartItem.productId,
@@ -58,47 +53,49 @@ export const createOrderFromCart = async (userId: string, userEmail: string) => 
       price: cartItem.product.price,
     }));
 
-    await tx.orderItem.createMany({
-      data: orderItemsData,
-    });
+    await tx.orderItem.createMany({ data: orderItemsData });
 
-    // 3C. Hapus/Kosongkan Keranjang
-    await tx.cartItem.deleteMany({
-      where: { cartId: cart.id },
-    });
+    // Kosongkan keranjang
+    await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
-    // 4. Generate URL Pembayaran Xendit (Invoice Method)
-    const invoiceRequestData: any = {
-      externalId: order.id,
-      amount: totalAmount,
-      payerEmail: userEmail,
-      description: `Pembelian Produk Digital dari .prodigi`,
-      successRedirectUrl: `${env.FRONTEND_URL}/order/success?orderId=${order.id}`,
-      failureRedirectUrl: `${env.FRONTEND_URL}/order/failed?orderId=${order.id}`,
-    };
-
-
-    // Panggil Xendit SDK secara async di dalam blok (Perlu ditangani dengan await secara perlahan)
-    const invoiceResponse = await invoiceClient.createInvoice({
-      data: invoiceRequestData
-    });
-
-    // 5. Simpan Data Pembayaran/Link Xendit ke Tabel Payment
-    const payment = await tx.payment.create({
-      data: {
-        orderId: order.id,
-        paymentMethod: 'XENDIT_INVOICE',
-        invoiceId: invoiceResponse.id,
-        paymentUrl: invoiceResponse.invoiceUrl, // Ini URL web yang dibungkus Xendit untuk dibayar UI
-        status: 'PENDING',
-      },
-    });
-
-    return { order, paymentUrl: payment.paymentUrl };
+    return { order };
   });
 
-  return result;
+  // 4. Panggil Xendit di LUAR transaction (hindari TX timeout / orphan invoice)
+  let invoiceResponse: any;
+  try {
+    invoiceResponse = await invoiceClient.createInvoice({
+      data: {
+        externalId: order.id,
+        amount: totalAmount,
+        payerEmail: userEmail,
+        description: `Pembelian Produk Digital dari .prodigi`,
+        successRedirectUrl: `${env.FRONTEND_URL}/order/success?orderId=${order.id}`,
+        failureRedirectUrl: `${env.FRONTEND_URL}/order/failed?orderId=${order.id}`,
+      },
+    });
+    console.log(`[createOrderFromCart] Xendit invoice created: ${invoiceResponse.id} for order ${order.id}`);
+  } catch (xenditErr: any) {
+    // Rollback: hapus order yang sudah dibuat karena Xendit gagal
+    console.error('[createOrderFromCart] Xendit createInvoice FAILED:', xenditErr?.response?.data ?? xenditErr?.message ?? xenditErr);
+    await prisma.order.delete({ where: { id: order.id } }).catch(() => {});
+    throw new Error('Gagal membuat invoice pembayaran. Silakan coba lagi.');
+  }
+
+  // 5. Simpan data Payment
+  const payment = await prisma.payment.create({
+    data: {
+      orderId: order.id,
+      paymentMethod: 'XENDIT_INVOICE',
+      invoiceId: invoiceResponse.id,
+      paymentUrl: invoiceResponse.invoiceUrl ?? invoiceResponse.url,
+      status: 'PENDING',
+    },
+  });
+
+  return { order, paymentUrl: payment.paymentUrl };
 };
+
 
 // Fungsi lain (Melihat list pesanan yang sudah ada)
 export const getUserOrders = async (userId: string) => {
@@ -239,6 +236,12 @@ export const handleXenditInvoiceWebhook = async (
           expiresAt = existingLibrary.expiresAt;
         }
 
+        // Generate license key for LICENSE_KEY product type (only on first purchase)
+        const isLicenseKeyType = product.productType === 'LICENSE_KEY';
+        const licenseKey = isLicenseKeyType
+          ? randomBytes(16).toString('hex').toUpperCase().match(/.{4}/g)!.join('-') // e.g. XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+          : null;
+
         await tx.libraryItem.upsert({
           where: { userId_productId: { userId, productId } },
           create: {
@@ -249,6 +252,7 @@ export const handleXenditInvoiceWebhook = async (
             expiresAt,
             accessUrlSnapshot: product.accessUrl,
             downloadUrlSnapshot: product.downloadUrl,
+            ...(licenseKey ? { licenseKey } : {}),
           },
           update: {
             orderItemId: item.id,
@@ -404,8 +408,15 @@ export const resendOrderEmail = async (userId: string, orderId: string, userEmai
   });
 };
 
-export const getAllOrdersAdmin = async () => {
+export const getAllOrdersAdmin = async (adminId: string) => {
   const orders = await prisma.order.findMany({
+    where: {
+      items: {
+        some: {
+          product: { adminId: adminId },  // STRICT: only this admin's products
+        },
+      },
+    },
     include: {
       user: { select: { id: true, email: true } },
       items: { include: { product: { select: { id: true, name: true } } } },

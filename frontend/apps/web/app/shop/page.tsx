@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { formatIDR } from "@/lib/currency";
 import { resolveImageUrl } from "@/lib/image";
@@ -11,7 +12,7 @@ import { useToast } from "@/context/ToastContext";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import {
   Search, X, SlidersHorizontal, ShoppingCart,
-  LayoutGrid, List, Package, CheckCircle2, ArrowUpDown
+  LayoutGrid, List, Package, CheckCircle2, ArrowUpDown, Tag
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,6 +22,7 @@ interface Category { id: string; name: string; }
 interface Product {
   id: string; name: string; description: string;
   price: number; imageUrl: string | null; category: Category; productType: string;
+  tags: string[];
 }
 
 const SORT_OPTIONS = [
@@ -35,17 +37,26 @@ const TYPE_FILTERS = [
   { value: "FILE", label: "Downloads" },
   { value: "COURSE", label: "Courses" },
   { value: "SUBSCRIPTION", label: "Membership" },
+  { value: "LICENSE_KEY", label: "Keys" },
 ];
 
 export default function ShopPage() {
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("");
+  const [selectedTag, setSelectedTag] = useState<string>("");
   const [sortBy, setSortBy] = useState("newest");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { addItem, items } = useCart();
+
+  // Read ?tag= from URL on mount
+  useEffect(() => {
+    const tagParam = searchParams?.get("tag");
+    if (tagParam) setSelectedTag(decodeURIComponent(tagParam));
+  }, [searchParams]);
   const { user } = useAuth();
   const { owned } = useToast();
 
@@ -84,18 +95,26 @@ export default function ShopPage() {
     },
   });
 
-  // Client-side sort + type filter
+  // Client-side sort + type + tag filter
   const products = React.useMemo(() => {
     let list = rawProducts ?? [];
     if (selectedType) list = list.filter(p => p.productType === selectedType);
+    if (selectedTag) list = list.filter(p => p.tags?.includes(selectedTag));
     if (sortBy === "price_asc") list = [...list].sort((a, b) => a.price - b.price);
     else if (sortBy === "price_desc") list = [...list].sort((a, b) => b.price - a.price);
     else if (sortBy === "name_asc") list = [...list].sort((a, b) => a.name.localeCompare(b.name));
     return list;
-  }, [rawProducts, selectedType, sortBy]);
+  }, [rawProducts, selectedType, selectedTag, sortBy]);
+
+  // Collect all unique tags from fetched products
+  const allTags = React.useMemo(() => {
+    const set = new Set<string>();
+    (rawProducts ?? []).forEach(p => p.tags?.forEach(t => set.add(t)));
+    return [...set].sort();
+  }, [rawProducts]);
 
   const isInCart = (id: string) => items.some(i => i.id === id);
-  const hasFilters = selectedCategory || selectedType || debouncedSearch;
+  const hasFilters = selectedCategory || selectedType || selectedTag || debouncedSearch;
 
   return (
     <div className="min-h-screen bg-black pt-24 pb-24">
@@ -205,11 +224,34 @@ export default function ShopPage() {
             {/* Clear Filters */}
             {hasFilters && (
               <button
-                onClick={() => { setSelectedCategory(""); setSelectedType(""); setSearch(""); }}
+                onClick={() => { setSelectedCategory(""); setSelectedType(""); setSelectedTag(""); setSearch(""); }}
                 className="w-full px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-red-400 border border-white/5 hover:border-red-500/20 transition-all"
               >
                 Clear All Filters
               </button>
+            )}
+
+            {/* Tags Filter */}
+            {allTags.length > 0 && (
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-600 mb-3">Tags</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {allTags.map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => setSelectedTag(selectedTag === tag ? "" : tag)}
+                      className={cn(
+                        "flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wide transition-all border",
+                        selectedTag === tag
+                          ? "bg-indigo-600/20 border-indigo-500/40 text-indigo-300"
+                          : "bg-white/[0.02] border-white/5 text-gray-600 hover:text-white hover:border-white/10"
+                      )}
+                    >
+                      <Tag className="w-2.5 h-2.5" />{tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </aside>
 
@@ -260,6 +302,24 @@ export default function ShopPage() {
                           <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400">{product.category?.name}</p>
                           <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors line-clamp-1">{product.name}</h3>
                           <p className="text-[11px] text-gray-600 line-clamp-2 min-h-[2rem]">{product.description}</p>
+                          {product.tags?.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {product.tags.slice(0, 3).map(tag => (
+                                <button
+                                  key={tag}
+                                  onClick={e => { e.preventDefault(); setSelectedTag(selectedTag === tag ? "" : tag); }}
+                                  className={cn(
+                                    "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide border transition-all",
+                                    selectedTag === tag
+                                      ? "bg-indigo-600/20 border-indigo-500/30 text-indigo-300"
+                                      : "bg-white/[0.03] border-white/5 text-gray-600 hover:text-indigo-400 hover:border-indigo-500/20"
+                                  )}
+                                >
+                                  <Tag className="w-2 h-2" />{tag}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                           <div className="flex items-center justify-between pt-2 border-t border-white/5">
                             <span className="text-base font-black text-white">{formatIDR(product.price)}</span>
                             <button
@@ -310,7 +370,23 @@ export default function ShopPage() {
                       <Link href={`/shop/${product.id}`}>
                         <p className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors truncate">{product.name}</p>
                       </Link>
-                      <p className="text-[10px] text-gray-600 font-medium">{product.category?.name} · {product.productType}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <p className="text-[10px] text-gray-600 font-medium">{product.category?.name} · {product.productType}</p>
+                        {product.tags?.slice(0, 2).map(tag => (
+                          <button
+                            key={tag}
+                            onClick={() => setSelectedTag(selectedTag === tag ? "" : tag)}
+                            className={cn(
+                              "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide border transition-all",
+                              selectedTag === tag
+                                ? "bg-indigo-600/20 border-indigo-500/30 text-indigo-300"
+                                : "bg-white/[0.03] border-white/5 text-gray-500 hover:text-indigo-400"
+                            )}
+                          >
+                            <Tag className="w-2 h-2" />{tag}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <span className="text-sm font-black text-white flex-shrink-0">{formatIDR(product.price)}</span>
                     <button

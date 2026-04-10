@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { 
   TrendingUp, 
@@ -46,9 +47,11 @@ const QUICKLINKS = [
 ];
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
+  
   const { data: products } = useQuery({
-    queryKey: ["admin", "products"],
-    queryFn: async () => { const res = await api.get("/products"); return res.data; },
+    queryKey: ["admin", "products", user?.id],
+    queryFn: async () => { const res = await api.get("/products/admin/mine"); return res.data; },
   });
 
   const { data: categories } = useQuery({

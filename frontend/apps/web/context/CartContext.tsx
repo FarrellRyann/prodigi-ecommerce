@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 interface Product {
   id: string;
@@ -20,32 +21,38 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+// Cart key scoped per user so different users on the same browser never share a cart
+const cartKey = (userId?: string) =>
+  userId ? `prodigi_cart_${userId}` : "prodigi_cart_guest";
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [items, setItems] = useState<Product[]>([]);
 
-  // Load from localStorage on mount
+  // Reload cart from localStorage whenever the logged-in user changes
   useEffect(() => {
-    const savedCart = localStorage.getItem("prodigi_cart");
-    if (savedCart) {
+    const key = cartKey(user?.id);
+    const saved = localStorage.getItem(key);
+    if (saved) {
       try {
-        setItems(JSON.parse(savedCart));
-      } catch (e) {
-        console.error("Failed to parse cart", e);
+        setItems(JSON.parse(saved));
+      } catch {
+        setItems([]);
       }
+    } else {
+      setItems([]); // clear in-memory when switching users
     }
-  }, []);
+  }, [user?.id]); // re-run on login / logout / user switch
 
-  // Sync with localStorage on change
+  // Persist to localStorage on every change
   useEffect(() => {
-    localStorage.setItem("prodigi_cart", JSON.stringify(items));
-  }, [items]);
+    const key = cartKey(user?.id);
+    localStorage.setItem(key, JSON.stringify(items));
+  }, [items, user?.id]);
 
   const addItem = (product: Product) => {
     setItems((prev) => {
-      // Prevent duplicates in cart
-      if (prev.find((item) => item.id === product.id)) {
-        return prev;
-      }
+      if (prev.find((item) => item.id === product.id)) return prev;
       return [...prev, product];
     });
   };
@@ -54,9 +61,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => prev.filter((item) => item.id !== productId));
   };
 
-  const clearCart = () => {
-    setItems([]);
-  };
+  const clearCart = () => setItems([]);
 
   const totalPrice = items.reduce((acc, item) => acc + item.price, 0);
   const itemCount = items.length;

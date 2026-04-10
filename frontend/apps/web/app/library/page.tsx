@@ -8,7 +8,7 @@ import { resolveImageUrl } from "@/lib/image";
 import { useAuth } from "@/context/AuthContext";
 import {
   Download, ExternalLink, Clock, BookOpen, Sparkles, Loader2,
-  Package, Library, ArrowRight, Search, CheckCircle2, FileBadge, Monitor
+  Package, Library, ArrowRight, Search, CheckCircle2, FileBadge, Monitor, Key, Tag, Copy
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,6 +20,7 @@ interface LibraryItem {
   productId: string;
   purchasedAt: string;
   expiresAt: string | null;
+  licenseKey: string | null;
   downloadUrlSnapshot?: string | null;
   accessUrlSnapshot?: string | null;
   product: {
@@ -27,9 +28,10 @@ interface LibraryItem {
     name: string;
     description: string | null;
     imageUrl: string | null;
-    productType: "COURSE" | "FILE" | "SUBSCRIPTION";
+    productType: "COURSE" | "FILE" | "SUBSCRIPTION" | "LICENSE_KEY";
     downloadUrl?: string | null;
     accessUrl?: string | null;
+    tags: string[];
   };
 }
 
@@ -38,6 +40,7 @@ const TYPE_TABS = [
   { value: "FILE", label: "Downloads", icon: <Download className="w-3.5 h-3.5" /> },
   { value: "COURSE", label: "Courses", icon: <Monitor className="w-3.5 h-3.5" /> },
   { value: "SUBSCRIPTION", label: "Membership", icon: <FileBadge className="w-3.5 h-3.5" /> },
+  { value: "LICENSE_KEY", label: "Keys", icon: <Key className="w-3.5 h-3.5" /> },
 ];
 
 export default function LibraryPage() {
@@ -45,6 +48,7 @@ export default function LibraryPage() {
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState("");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const { data: libraryItems, isLoading } = useQuery<LibraryItem[]>({
     queryKey: ["library"],
@@ -70,6 +74,12 @@ export default function LibraryPage() {
   const handleAccess = (item: LibraryItem) => {
     const url = item.accessUrlSnapshot || item.product.accessUrl;
     if (url) window.open(url, "_blank");
+  };
+
+  const handleCopyKey = (key: string, productId: string) => {
+    navigator.clipboard.writeText(key);
+    setCopiedKey(productId);
+    setTimeout(() => setCopiedKey(null), 2000);
   };
 
   const filtered = libraryItems?.filter(item => {
@@ -179,6 +189,7 @@ export default function LibraryPage() {
                 const img = resolveImageUrl(item.product.imageUrl);
                 const isCourse = item.product.productType === "COURSE";
                 const isSub = item.product.productType === "SUBSCRIPTION";
+                const isKey = item.product.productType === "LICENSE_KEY";
                 const isExpired = item.expiresAt && new Date(item.expiresAt) < new Date();
 
                 return (
@@ -200,10 +211,11 @@ export default function LibraryPage() {
                           "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest backdrop-blur-sm",
                           isCourse ? "bg-violet-500/20 border border-violet-500/30 text-violet-300"
                             : isSub ? "bg-amber-500/20 border border-amber-500/30 text-amber-300"
+                            : isKey ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-300"
                             : "bg-indigo-500/20 border border-indigo-500/30 text-indigo-300"
                         )}>
-                          {isCourse ? <Monitor className="w-3 h-3" /> : isSub ? <FileBadge className="w-3 h-3" /> : <Download className="w-3 h-3" />}
-                          {isCourse ? "Course" : isSub ? "Membership" : "Download"}
+                          {isCourse ? <Monitor className="w-3 h-3" /> : isSub ? <FileBadge className="w-3 h-3" /> : isKey ? <Key className="w-3 h-3" /> : <Download className="w-3 h-3" />}
+                          {isCourse ? "Course" : isSub ? "Membership" : isKey ? "License Key" : "Download"}
                         </span>
                       </div>
                       {/* Expiry */}
@@ -225,9 +237,36 @@ export default function LibraryPage() {
                           <span>{new Date(item.purchasedAt).toLocaleDateString()}</span>
                         </div>
                       </div>
-                      <p className="text-[11px] text-gray-600 line-clamp-2 flex-grow">
+                      <p className="text-[11px] text-gray-600 line-clamp-2 mb-3">
                         {item.product.description || "Secure digital asset with lifetime access."}
                       </p>
+
+                      {/* Tags */}
+                      {(item.product.tags?.length ?? 0) > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {item.product.tags.slice(0, 3).map(tag => (
+                            <span key={tag} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-[8px] font-bold text-gray-600 uppercase tracking-wide">
+                              <Tag className="w-2 h-2" />{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* License Key Display */}
+                      {isKey && item.licenseKey && (
+                        <div className="mb-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15 space-y-1">
+                          <p className="text-[9px] font-black text-emerald-500/70 uppercase tracking-widest">License Key</p>
+                          <div className="flex items-center gap-2">
+                            <code className="text-[10px] font-mono text-emerald-300 flex-grow tracking-wider break-all">{item.licenseKey}</code>
+                            <button
+                              onClick={() => handleCopyKey(item.licenseKey!, item.productId)}
+                              className="flex-shrink-0 p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all"
+                            >
+                              {copiedKey === item.productId ? <CheckCircle2 className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Actions */}
                       <div className="mt-5 pt-4 border-t border-white/5 flex items-center gap-3">

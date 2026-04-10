@@ -18,6 +18,7 @@ export const registerSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
   role: z.enum(['ADMIN', 'CUSTOMER']).optional().default('CUSTOMER'),
+  username: z.string().optional(),
 });
 
 export const loginSchema = z.object({
@@ -34,10 +35,10 @@ export const updateCategorySchema = z.object({
   name: z.string().min(1, 'Category name is required'),
 });
 
-// Helper: treat empty string the same as null for optional URL fields
+// Helper: treat empty string as null; undefined (field not sent) stays undefined so Zod omits it
 const optionalUrl = (msg: string) =>
   z.preprocess(
-    (v) => (v === '' || v === undefined ? null : v),
+    (v) => (v === '' ? null : v),   // ONLY '' -> null; undefined stays undefined
     z.string().url(msg).nullable().optional()
   );
 
@@ -47,10 +48,15 @@ export const createProductSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
   description: z.preprocess((v) => (v === '' ? null : v), z.string().nullable().optional()),
   price: z.coerce.number().int().positive('Price must be a positive integer'),
-  productType: z.enum(['FILE', 'COURSE', 'SUBSCRIPTION']).optional().default('FILE'),
+  productType: z.enum(['FILE', 'COURSE', 'SUBSCRIPTION', 'LICENSE_KEY']).optional().default('FILE'),
   imageUrl: optionalUrl('Invalid image URL'),
   downloadUrl: optionalUrl('Invalid download URL'),
   accessUrl: optionalUrl('Invalid access URL'),
+  // tags can be a comma-separated string (FormData) or array — handled in controller; pass through as-is
+  tags: z.preprocess(
+    (v) => v,
+    z.union([z.string(), z.array(z.string())])
+  ).optional(),
 });
 
 export const updateProductSchema = z.object({
@@ -58,10 +64,15 @@ export const updateProductSchema = z.object({
   name: z.string().min(1, 'Product name cannot be empty').optional(),
   description: z.preprocess((v) => (v === '' ? null : v), z.string().nullable().optional()),
   price: z.coerce.number().int().positive('Price must be a positive integer').optional(),
-  productType: z.enum(['FILE', 'COURSE', 'SUBSCRIPTION']).optional(),
+  productType: z.enum(['FILE', 'COURSE', 'SUBSCRIPTION', 'LICENSE_KEY']).optional(),
   imageUrl: optionalUrl('Invalid image URL'),
   downloadUrl: optionalUrl('Invalid download URL'),
   accessUrl: optionalUrl('Invalid access URL'),
+  // tags — same as create
+  tags: z.preprocess(
+    (v) => v,
+    z.union([z.string(), z.array(z.string())])
+  ).optional(),
 });
 
 // Cart

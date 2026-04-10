@@ -1,15 +1,17 @@
 "use client";
 
-import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatIDR } from "@/lib/currency";
 import { resolveImageUrl } from "@/lib/image";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/context/ToastContext";
 import {
   User, Mail, Shield, LogOut, Library, ShoppingBag,
-  Wallet, Calendar, ChevronRight, Loader2, Package, Clock, CheckCircle2, XCircle, AlertCircle
+  Wallet, Calendar, ChevronRight, Loader2, Package, Clock, CheckCircle2, XCircle, AlertCircle,
+  AtSign, Pencil, X, Check
 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -31,6 +33,7 @@ interface Order {
 interface ProfileData {
   id: string;
   email: string;
+  username: string | null;
   role: string;
   createdAt: string;
   orderCount: number;
@@ -50,11 +53,30 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
 
   const { data: profile, isLoading } = useQuery<ProfileData>({
     queryKey: ["profile"],
     queryFn: async () => (await api.get("/auth/profile")).data,
     enabled: !!user,
+  });
+
+  const usernameMutation = useMutation({
+    mutationFn: async (username: string) => {
+      const res = await api.put("/auth/username", { username });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toastSuccess("Username updated!");
+      setEditingUsername(false);
+    },
+    onError: (err: any) => {
+      toastError("Update Failed", err?.response?.data?.error ?? "Failed to update username.");
+    },
   });
 
   if (!user) {
@@ -76,7 +98,7 @@ export default function ProfilePage() {
     router.push("/");
   };
 
-  const initials = user.email.split("@")[0].slice(0, 2).toUpperCase();
+  const initials = (user.email.split("@")[0] ?? "?").slice(0, 2).toUpperCase();
   const memberSince = profile ? new Date(profile.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long" }) : "—";
 
   return (
@@ -98,7 +120,9 @@ export default function ProfilePage() {
             {/* Info */}
             <div className="flex-grow space-y-1.5">
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-black text-white tracking-tight">{user.email.split("@")[0]}</h1>
+                <h1 className="text-2xl font-black text-white tracking-tight">
+                  {profile?.username ? `@${profile.username}` : user.email.split("@")[0]}
+                </h1>
                 <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
                   user.role === "ADMIN"
                     ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
@@ -112,6 +136,39 @@ export default function ProfilePage() {
                 <Mail className="w-3.5 h-3.5" />
                 <span className="text-sm font-medium">{user.email}</span>
               </div>
+              {/* Username edit */}
+              {editingUsername ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <AtSign className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={newUsername}
+                    onChange={e => setNewUsername(e.target.value.replace(/[^a-z0-9_]/gi, '').toLowerCase())}
+                    placeholder={profile?.username ?? "username"}
+                    autoFocus
+                    className="bg-white/[0.05] border border-indigo-500/30 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500 w-40"
+                  />
+                  <button
+                    onClick={() => newUsername.length >= 3 && usernameMutation.mutate(newUsername)}
+                    disabled={usernameMutation.isPending || newUsername.length < 3}
+                    className="p-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-all"
+                  >
+                    {usernameMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  </button>
+                  <button onClick={() => setEditingUsername(false)} className="p-1.5 rounded-lg bg-white/5 text-gray-500 hover:text-white transition-all">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setNewUsername(profile?.username ?? ""); setEditingUsername(true); }}
+                  className="flex items-center gap-1.5 text-[10px] text-gray-600 hover:text-indigo-400 transition-colors font-bold group"
+                >
+                  <AtSign className="w-3 h-3" />
+                  <span>{profile?.username ? profile.username : "Set username"}</span>
+                  <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              )}
               <div className="flex items-center gap-2 text-gray-600">
                 <Calendar className="w-3.5 h-3.5" />
                 <span className="text-xs font-bold">Member since {memberSince}</span>
@@ -211,7 +268,7 @@ export default function ProfilePage() {
           ) : (
             <div className="divide-y divide-white/[0.03]">
               {profile.recentOrders.map((order) => {
-                const st = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.PENDING;
+                const st = (STATUS_CONFIG[order.status] ?? STATUS_CONFIG['PENDING'])!;
                 const firstItem = order.items[0];
                 return (
                   <div key={order.id} className="flex items-center gap-4 px-8 py-5 hover:bg-white/[0.02] transition-colors">

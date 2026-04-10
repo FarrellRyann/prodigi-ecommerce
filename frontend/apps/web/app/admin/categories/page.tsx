@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import AdminSidebar from "@/components/AdminSidebar";
+import { useToast } from "@/context/ToastContext";
 import { 
   Layers, 
   Plus, 
@@ -14,7 +15,8 @@ import {
   Package,
   Check,
   X,
-  Tag
+  Tag,
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,10 +29,12 @@ interface Category {
 
 export default function CategoriesPage() {
   const queryClient = useQueryClient();
+  const { error: toastError, success: toastSuccess } = useToast();
   const [newName, setNewName] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
 
   const { data: categories, isLoading } = useQuery<Category[]>({
     queryKey: ["admin", "categories"],
@@ -67,6 +71,20 @@ export default function CategoriesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+      toastSuccess("Category deleted successfully.");
+      setDeleteTarget(null);
+    },
+    onError: (err: any) => {
+      setDeleteTarget(null);
+      const msg: string = err?.response?.data?.error ?? err.message ?? "Failed to delete category.";
+      if (err?.response?.status === 409 || msg.toLowerCase().includes("products")) {
+        toastError(
+          "Cannot Delete Category",
+          msg
+        );
+      } else {
+        toastError("Delete Failed", msg);
+      }
     },
   });
 
@@ -226,7 +244,7 @@ export default function CategoriesPage() {
                                 <Edit size={14} />
                               </button>
                               <button
-                                onClick={() => { if (confirm(`Delete "${cat.name}"?`)) deleteMutation.mutate(cat.id); }}
+                                onClick={() => setDeleteTarget(cat)}
                                 className="p-2 rounded-xl bg-red-500/5 border border-red-500/5 text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all"
                               >
                                 <Trash2 size={14} />
@@ -248,6 +266,53 @@ export default function CategoriesPage() {
           </div>
         </div>
       </main>
+
+      {/* Delete Confirm Modal */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative z-10 w-full max-w-sm mx-4 p-6 rounded-3xl bg-[#0a0a0a] border border-white/10 space-y-5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-white">Delete Category?</p>
+                  <p className="text-[10px] text-gray-600 font-medium mt-0.5">This cannot be undone.</p>
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <p className="text-xs font-bold text-gray-300 truncate">{deleteTarget.name}</p>
+                <p className="text-[10px] text-gray-600 mt-0.5">{deleteTarget._count?.products ?? 0} products in this category</p>
+              </div>
+              {(deleteTarget._count?.products ?? 0) > 0 && (
+                <p className="text-[11px] text-amber-400/80 leading-relaxed">
+                  ⚠ This category has products. Move or delete them first.
+                </p>
+              )}
+              <div className="flex gap-3">
+                <button onClick={() => setDeleteTarget(null)} className="flex-1 h-11 rounded-xl bg-white/[0.03] border border-white/5 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => deleteMutation.mutate(deleteTarget.id)}
+                  disabled={deleteMutation.isPending}
+                  className="flex-1 h-11 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
